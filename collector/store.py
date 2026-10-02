@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from . import config
 
-DETAIL_FILES = {"BOTTOM": "bottom.json.gz", "UTILITY": "utility.json.gz"}
+DETAIL_FILES = {"BOTTOM": "bottom.json.gz", "UTILITY": "utility.json.gz", "JUNGLE": "jungle.json.gz"}
 PATCH_PATTERN = re.compile(r"^\d+\.\d+$")
 
 
@@ -205,12 +205,29 @@ class Store:
         season = self._season(season_of(patch_name))
         player = season["players"].setdefault(code, {})
         _count(player, "all", win)
-        if champ not in season["champions"] and _bot_or_support(roles):
-            season["champions"].add(champ)  # stays for the rest of the season
+        if champ not in season["champions"] and _site_role_champion(roles):
+            # Joins for the rest of the season. Its earlier games (this one
+            # included, since the patch file is updated first) are copied in.
+            season["champions"].add(champ)
+            self._copy_from_patches(season, season_of(patch_name), champ)
+            return
         if champ in season["champions"]:
             _count(player, champ, win)
             if tag:
                 _count(player, champ + ":" + tag, win)
+
+    def _copy_from_patches(self, season, season_name, champ):
+        keys = [champ] + [champ + ":" + tag for tag in config.ROLE_TAGS.values()]
+        for name, patch in self.patches.items():
+            if season_of(name) != season_name:
+                continue
+            for code, champs in patch["players"].items():
+                if champ not in champs:
+                    continue
+                player = season["players"].setdefault(code, {})
+                for key in keys:
+                    if key in champs:
+                        _add(player, key, *champs[key])
 
     def _seed_seasons(self):
         """Build season totals from the patch files when a season has none yet,
@@ -224,7 +241,7 @@ class Store:
             season = self._season(season_name)
             for name in names:
                 for champ, entry in self.patches[name]["champions"].items():
-                    if _bot_or_support(entry["roles"]):
+                    if _site_role_champion(entry["roles"]):
                         season["champions"].add(champ)
             for name in names:
                 for code, champs in self.patches[name]["players"].items():
@@ -330,7 +347,9 @@ class Store:
                     patch[key] = summary[key]
                 patch["champions"] = _read(os.path.join(folder, "champions.json"))
                 for role, filename in DETAIL_FILES.items():
-                    patch["detail"][role] = _read(os.path.join(folder, filename))
+                    path = os.path.join(folder, filename)
+                    # Patches saved before a role was added simply start empty for it.
+                    patch["detail"][role] = _read(path) if os.path.exists(path) else {}
                 patch["players"] = _read(os.path.join(folder, "players.json.gz"))
                 store.patches[name] = patch
             seasons_dir = os.path.join(root, "season")
@@ -360,8 +379,8 @@ def _add(table, key, games, wins):
     counter[1] += wins
 
 
-def _bot_or_support(roles):
-    """True when a champion is played enough in bot lane or support."""
+def _site_role_champion(roles):
+    """True when a champion is played enough in bot lane, support or jungle."""
     total = sum(c[0] + c[2] for c in roles.values())
     if total < config.SEASON_CHAMPION_MIN_GAMES:
         return False
@@ -415,22 +434,24 @@ run's copy.
   (weighted and unweighted), and average win rate per role.
 - `champions.json`: per champion ID: name, games and wins per role, and bans.
   Bans count once per game: [games banned on double-weight servers, on other servers].
-- `bottom.json.gz`, `utility.json.gz`: per ADC/support champion: games, final
-  items, rune pages, and allies/enemies as "championId:role".
+- `bottom.json.gz`, `utility.json.gz`, `jungle.json.gz`: per champion played
+  in that role: games, final items, rune pages, and allies/enemies as
+  "championId:role". Jungle was added on Oct 3, 2026.
 - `players.json.gz`: per scrambled player code, `[games, wins]` per champion ID
-  (all roles), plus `"ID:B"` (bot lane) and `"ID:S"` (support) for games in
-  those roles. Used for the "recent games" part of the OTP rule (current +
+  (all roles), plus `"ID:B"` (bot lane), `"ID:S"` (support) and `"ID:J"`
+  (jungle, from Oct 3, 2026) for games in those roles. Used for the "recent games" part of the OTP rule (current +
   previous patch). Real player IDs are never stored.
 
 ## season/<season>/players.json.gz
 Running totals for the whole season (season 16 = patches 16.x), never pruned
 during the season, for the "50 games this season" part of the OTP rule:
 - `players`: per scrambled player code, `"all"` = `[games, wins]` across every
-  champion, plus `[games, wins]` per champion ID and per `"ID:B"` / `"ID:S"`,
-  only for bot-lane and support champions.
-- `champions`: the bot-lane and support champion IDs counted this season (at
-  least 200 games in a patch with at least 10% in bot lane or support; once in,
-  they stay).
+  champion, plus `[games, wins]` per champion ID and per `"ID:B"` / `"ID:S"` /
+  `"ID:J"`, only for bot-lane, support and jungle champions.
+- `champions`: the champion IDs counted this season (at least 200 games in a
+  patch with at least 10% in bot lane, support or jungle; once in, they stay).
+  When a champion joins, its earlier games are copied in from the patch files
+  still kept (the last 3 patches).
 Games collected before season totals existed were copied in from the patch
 files (without the bot/support split, which starts from that point).
 

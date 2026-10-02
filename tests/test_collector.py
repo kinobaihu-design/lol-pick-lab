@@ -121,14 +121,17 @@ class SeasonTests(unittest.TestCase):
         self.assertEqual(season["champions"], {str(100 + i) for i in range(10)} & season["champions"])
         self.assertIn("103", season["champions"])   # always played bot lane
         self.assertIn("109", season["champions"])   # always played support
+        self.assertIn("101", season["champions"])   # always jungle
         self.assertNotIn("100", season["champions"])  # always top lane
         adc = season["players"][scramble("player-3")]
         top = season["players"][scramble("player-0")]
         games = config.SEASON_CHAMPION_MIN_GAMES
         self.assertEqual(adc["all"], [games, games])
-        # The champion qualifies after its 200th game, which is then counted.
-        self.assertEqual(adc["103"], [1, 1])
-        self.assertEqual(adc["103:B"], [1, 1])
+        # The champion qualifies at its 200th game; its earlier games are copied in.
+        self.assertEqual(adc["103"], [games, games])
+        self.assertEqual(adc["103:B"], [games, games])
+        jungler = season["players"][scramble("player-1")]
+        self.assertEqual(jungler["101:J"], [games, games])
         self.assertEqual(top["all"], [games, games])
         self.assertNotIn("100", top)  # top-lane champion: total only
         patch_player = store.patches["16.19"]["players"][scramble("player-3")]
@@ -167,6 +170,30 @@ class SeasonTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             store.save(root, {})
             self.assertEqual(sorted(os.listdir(os.path.join(root, "season"))), ["15", "16"])
+
+
+class JungleTests(unittest.TestCase):
+    def test_jungle_detail_and_tags(self):
+        store = Store()
+        everyone = {scramble("player-%d" % i) for i in range(10)}
+        store.add_match(compact_match(fake_match(), "EUW1_1", "EUW1"), everyone)
+        patch = store.patches["16.19"]
+        jungle = patch["detail"]["JUNGLE"]["101"]
+        self.assertEqual(jungle["games"], [1, 1, 0, 0])
+        self.assertIn("3006", jungle["items"])
+        self.assertEqual(len(jungle["enemies"]), 5)
+        self.assertEqual(patch["players"][scramble("player-1")], {"101": [1, 1], "101:J": [1, 1]})
+
+    def test_old_saves_without_jungle_file_still_load(self):
+        store = Store()
+        everyone = {scramble("player-%d" % i) for i in range(10)}
+        store.add_match(compact_match(fake_match(), "EUW1_1", "EUW1"), everyone)
+        with tempfile.TemporaryDirectory() as root:
+            store.save(root, {})
+            os.remove(os.path.join(root, "patches", "16.19", "jungle.json.gz"))
+            loaded = Store.load(root)
+            self.assertEqual(loaded.patches["16.19"]["detail"]["JUNGLE"], {})
+            self.assertIn("103", loaded.patches["16.19"]["detail"]["BOTTOM"])
 
 
 class ConfigTests(unittest.TestCase):

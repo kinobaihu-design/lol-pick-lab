@@ -265,6 +265,7 @@ class Run:
                 "games_counted": st["counted"],
                 "adc_players_counted": st["role_BOTTOM"],
                 "support_players_counted": st["role_UTILITY"],
+                "jungle_players_counted": st["role_JUNGLE"],
                 "skipped_remake": st["remake"],
                 "skipped_not_ranked": st["not_ranked"],
                 "skipped_no_diamond_player": st["no_diamond"],

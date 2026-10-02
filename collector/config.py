@@ -35,16 +35,17 @@ PRIORITY_SERVERS = {
     "sea": [],
 }
 
-# Roles that get full detail (items, runes, allies, enemies).
-DETAIL_ROLES = ("BOTTOM", "UTILITY")
+# Roles that get full detail (items, runes, allies, enemies). The site's 3 roles.
+DETAIL_ROLES = ("BOTTOM", "UTILITY", "JUNGLE")
 # Short role tags used in the player files: "22:B" = Ashe games in bot lane.
-ROLE_TAGS = {"BOTTOM": "B", "UTILITY": "S"}
+ROLE_TAGS = {"BOTTOM": "B", "UTILITY": "S", "JUNGLE": "J"}
 
 # Season totals per player (for the OTP rule). A season is the first part of
 # the patch number (16.19 -> season 16). Per-champion counts are kept only for
-# bot-lane and support champions: at least SEASON_CHAMPION_MIN_GAMES games in a
-# patch of the season, with at least SEASON_CHAMPION_MIN_SHARE of them in bot lane or support.
-# Once a champion qualifies it stays for the rest of the season.
+# bot-lane, support and jungle champions: at least SEASON_CHAMPION_MIN_GAMES
+# games in a patch of the season, with at least SEASON_CHAMPION_MIN_SHARE of them
+# in one of those roles. Once a champion qualifies it stays for the rest of the
+# season, and its earlier games are copied in from the patch files still kept.
 SEASON_CHAMPION_MIN_GAMES = 200
 SEASON_CHAMPION_MIN_SHARE = 0.10
 KEEP_SEASONS = 2
