@@ -1,0 +1,8 @@
+# Private files that should never be uploaded
+project-brief.pdf
+.env
+.env.*
+*.key
+
+# Mac system files
+.DS_Store
