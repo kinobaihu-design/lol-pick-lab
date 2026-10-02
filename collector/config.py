@@ -46,7 +46,7 @@ RATE_LIMIT_SAFETY = 0.97
 # How often players are checked for new games.
 ACTIVE_RECHECK_HOURS = 5          # player had games last time: check again next run
 FIRST_INACTIVE_RECHECK_HOURS = 24  # no games: wait a day, then double each time
-MAX_RECHECK_HOURS = 168           # never wait more than a week
+MAX_RECHECK_HOURS = 336           # never wait more than 14 days
 NEW_PLAYER_LOOKBACK_DAYS = 7      # first check of a player looks this far back
 MAX_LOOKBACK_DAYS = 10            # never ask for games older than this
 OVERLAP_HOURS = 2                 # re-check a little before the last check (games in progress)
