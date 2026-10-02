@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.20**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -17,9 +17,10 @@ One review round per step, so we keep improving without getting stuck:
 2. **Review.** The owner asks questions. Claude names at least one possible improvement or risk.
 3. **Approve.** The owner says OK, with any changes agreed on. **Don't build before this.**
 4. **Build and test.** Claude builds it and shows the results in simple words.
-5. **Close.** Tick the board, log any model change as a new version (see "Model versions"), and remind the owner to refresh the brief if it changed.
+5. **Close.** Tick the board (tasks are ticked as soon as they're done), log any model change as a new version (see "Model versions"), and remind the owner to refresh the brief if it changed.
 
-Ideas that don't affect the current step go to the board or the open questions, so they aren't lost.
+- Ideas that don't affect the current step go to the board or the open questions, so they aren't lost.
+- **Facts vs opinions.** Anything that is a fact about the game (champion types, ranges, item stats, patch changes, Riot difficulty) is checked against an official source before it's used: Riot's data (Data Dragon) or the official League of Legends Wiki. The owner's opinions (mastery, feel, notes, their own difficulty rating) stay theirs and need no check.
 
 ## What the project is
 
@@ -49,49 +50,199 @@ A free public website that ranks ADC and support champions each patch using the 
 - Code: `collector/` (Python standard library only). Settings, including `PRIORITY_SHARE`, double-weight servers, recheck timing and patches kept, are in `collector/config.py`.
 - Schedule: `.github/workflows/collect.yml` runs every 6 hours, about 5 hours of work per run, and never two runs at once. "Run workflow" on the Actions page takes a time limit and a per-region game limit for tests. It saves a checkpoint every hour.
 - What it does: it loads each server's Diamond+ list and checks players for new queue 420 games. Active players are rechecked after 5 hours; inactive ones after 24 hours, then doubling up to 14 days (lookback stays 10 days). Each new game is downloaded once, and only Diamond+ participants are counted. Within each routing region, the priority servers get `PRIORITY_SHARE` (70%) of requests: Americas LAN and NA, Europe EUW, Asia KR. SEA is split evenly.
-- Data lives on the `data` branch, replaced each save with no history. `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as scrambled codes.
+- Data lives on the `data` branch, replaced each save with no history (fetch it with `git fetch origin +data:refs/remotes/origin/data`). `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as scrambled codes.
+- Champions are stored by Riot's champion ID. The `name` field is Riot's internal name (`Kaisa`, `MissFortune`, `KogMaw`); the website must take display names from Data Dragon.
 - Bans count once per game. Ban rate = games banned ÷ games counted.
 - Skill order isn't collected yet. It's planned for Phase 3, since it needs an extra request per game.
 - Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
-## Scoring model v0.3 (ADC)
+## Scoring model v0.20 (ADC): the full recipe
 
-`Pick Score = 0.4 × Stats + 0.5 × Comfort + 0.1 × OTP`. Each part is scored 0–100.
+Every part is scored 0–100, then weighted. The order of the steps:
 
-**Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 games this patch, ≥1% pick rate.
+1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 games this patch, ≥1% pick rate.
+2. **Stats (40%)** = 60% win rate points + 25% PBI + 15% pick rate.
+   - Win rate points = `50 + 12.5 × (win rate − Diamond+ average)`, clamped to 0–100: +4% → 100, +2% → 75, average → 50, −2% → 25, −4% → 0. The Diamond+ average comes from our own data each patch (expected to sit above 50%; Lolalytics shows 52.27%).
+   - PBI and pick rate are ranked 0–100 among eligible ADCs. Ban rate is not in the Pick Score; it feeds PBI and the ban list.
+3. **Comfort (50%)** comes from the champion cards (see "Comfort in detail"), capped at 100.
+4. **OTP delta (10%)** = OTP win rate − overall win rate, ranked 0–100 among eligible ADCs.
+5. **Pick Score** = `0.4 × Stats + 0.5 × Comfort + 0.1 × OTP`.
+6. **Tier:** S ≥ 80 · A 72–79.9 · B 64–71.9 · C 56–63.9 · D < 56. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The cutoffs and the floor are first guesses, calibrated in Phase 2 against the owner's gut ranking of 10 ADCs.
 
-**Stats (40%)** = 60% win rate points + 25% PBI + 15% pick rate.
-- Win rate points = `50 + 12.5 × (win rate − Diamond+ average win rate)`, clamped to 0–100. The average comes from our own data each patch.
-- PBI and pick rate are ranked 0–100 among eligible ADCs. Ban rate is not in the Pick Score; it feeds PBI and the ban list.
-
-**Comfort (50%)** = 70% champion type + 30% mastery.
-- Type: Mobility 100, Peel 90, Hypercarry 80, Mage 70, Discomfort 30.
-- Mastery: Main 100, Comfortable 95, Learning 80, Never played 60.
-- Each champion has a card with its type, mastery and a one-line note in the owner's words.
-
-**OTP delta (10%)** = OTP win rate − overall win rate, ranked 0–100 among eligible ADCs.
-
-**Tiers:** S ≥ 80 · A 72–79.9 · B 64–71.9 · C 56–63.9 · D < 56.
-- **Stats floor:** a champion 1.5% or more below the Diamond+ average win rate can't go above B.
+**Other lists:**
 - **Worth learning:** a Discomfort or Never-played champion with a top-3 Stats score also appears in a separate "Worth learning" list.
-- **Ban suggestions** cover any role: 60% PBI + 40% struggle list (100 if the owner struggles against it, otherwise 0).
+- **Ban suggestions** (any role, separate from picks) = 60% PBI + 40% struggle list (100 if the owner struggles against it, otherwise 0).
 
-The cutoffs and the floor are first guesses, to be calibrated in Phase 2 against the owner's gut ranking of 10 ADCs.
+### Comfort in detail
 
-## Project phases
+Comfort measures how much the owner likes a champion and how well they play it. Each card produces one final Comfort:
 
-- **Phase 0, setup:** done.
-- **Phase 1, data collector:** collector built and the Riot key stored as a secret. Still to do: run it a few days and check that sample sizes grow, and define the OTP rule.
-- **Phase 2, tier list website:** scoring code, champion cards, the ADC tier list page (Pick Score, Meta Score, ban suggestions, Worth learning, plus games played and a sample-size label of low, medium or high for every champion), publishing on Vercel, then tuning.
-- **Phase 3, builds:** build rules, and a champion page with core items, boots, runes and skill order.
-- **Phase 4, draft helper:** matchup and synergy data, and the draft screen.
-- **Phase 5, later:** support and other roles, and a production key if the site grows beyond friends.
+`Comfort = 40% type points + 60% mastery points + kit adjustment + difficulty adjustment`, capped at 100. Mastery counts more because how well the owner plays matters more than how much they like the style.
 
-**Open questions:** which champions the owner struggles against, and whether the tier cutoffs and stats floor are right.
+**Step 1: type points.** Each champion has one main type, fact-checked against these rules from its kit (official League of Legends Wiki):
+
+| Type | Points | Fact-check rule |
+|---|---|---|
+| Mobility (favorite) | 100 | Has a dash or blink it uses in fights |
+| Peel (2nd) | 90 | Has a tool made to protect itself: spell shield, untargetability, knockback or self-shield (like Sivir's E). Offensive CC like roots or slows doesn't count |
+| Hypercarry (3rd, tied) | 80 | Weaker early, scales into top late-game damage |
+| Utility (3rd, tied) | 80 | Its main value is reliably helping the team (CC, vision, ally support) more than its own damage or mobility, like Ashe |
+| Mage (4th, tied) | 70 | Deals most damage with magic abilities, not attacks |
+| Lane bully (4th, tied) | 70 | Strongest early; wins lane through damage and trades and snowballs leads (like Draven). Champions with a dash stay Mobility |
+
+- **Type strength** (how strongly it fits the type): High 100%, Mid 97.5%, Low 95% of the type points. Applies to the main type and the secondary type before they're compared. The 2.5% step is tunable.
+- **Secondary type** (optional): if its points (after strength) beat the main type's, add 20% of the gap. If not, it's shown for information only.
+- **Discomfort switch:** if the owner dislikes how a champion feels, type points become 30, whatever its type.
+- **Type fact-check:** the owner gives their view; Claude checks it against the rules above. If they disagree, the card shows both views and the owner decides.
+
+**Step 2: mastery points.** Main 100 · Comfortable 95 · Learning 80 · Never played 60.
+
+**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average is recalculated each patch from the eligible ADCs (7.5 on the current 16 cards). An average champion gets 0, so scores don't inflate.
+- Trait score = sum of `priority × level` for each trait the champion has.
+- Levels: Low 0.5 · Mid 1 · High 1.5. A trait that defines the champion's type isn't listed again.
+
+| Trait (7) | Owner's priority | Counts when the kit has… |
+|---|---|---|
+| Wave clear | High (3) | Clears a minion wave with abilities, without relying on items |
+| Team utility | High (3) | Shields, heals or speed for allies |
+| CC | Medium (2) | Stuns, roots, knockups, knock asides, snares, slows. High = reliable hard CC that decides fights; Mid = situational hard CC, or hard CC plus slows; Low = slows only |
+| Sustain | Medium (2) | Healing or lifesteal in the kit |
+| Burst | Medium (2) | Can kill or nearly kill a squishy target with one combo or empowered shot |
+| Poke | Medium (2) | Repeated damage from long range (1,000+ units) with abilities, available most of the game |
+| Vision | Low (1) | Reveals areas or enemies |
+
+**Step 4: difficulty adjustment** = `−3 × (difficulty − 2) × mastery factor`, capped at ±3 on Comfort (±1.5 on the Pick Score).
+- Difficulty = 80% the owner's rating + 20% Riot's (Low 1, Medium 2, High 3). It's compared with Medium (2), so harder means minus, easier means plus, and adding cards never changes other champions.
+- Mastery factor (mastery softens it, never to zero): Never played 100% · Learning 75% · Comfortable 50% · Main 25%.
+
+**Range** (on the card, not in the score): base attack range; short < 500, medium 500–599, long ≥ 600.
+
+## Champion cards (ADC)
+
+The cards hold the owner's inputs. The Comfort column is the brief's result and serves as test data for the scoring code, which must reproduce it within rounding. Type pts include strength and the secondary-type bonus.
+
+| Champion | Type (strength) / secondary (strength) | Type pts | Mastery | Traits (level) | Trait score | Difficulty Riot / mine → final | Comfort |
+|---|---|---|---|---|---|---|---|
+| Sivir | Peel (High) / Utility | 90 | Main | Team utility High, Wave clear High, Poke Mid, Sustain Low | 12 | 1.5 / 1 → 1.1 | 100 (100.7 capped) |
+| Caitlyn | Mobility (Mid) / Lane bully (Mid) | 97.5 | Comfortable | Wave clear Mid, CC Mid, Burst Mid, Poke Mid, Vision Mid | 10 | 1 / 1.5 → 1.4 | 99.1 |
+| Tristana | Mobility (High) / Hypercarry (Low) | 100 | Comfortable | Wave clear Mid, CC Low, Burst High | 7 | 2 / 2 → 2.0 | 96.5 |
+| Senna | Utility (High) / Hypercarry (Mid) | 80 | Comfortable | Team utility High, CC Mid, Sustain High, Poke Low | 10.5 | 3 / 1 → 1.4 | 92.6 |
+| Lucian | Mobility (High) / Lane bully (Low) | 100 | Comfortable | Burst Mid, Vision Low | 2.5 | 2 / 2 → 2.0 | 92.5 |
+| Ezreal | Mobility (High) | 100 | Comfortable | Poke Mid | 2 | 3 / 2.5 → 2.6 | 91.1 |
+| Jhin | Utility (Mid) | 78 | Comfortable | CC High, Burst High, Poke Mid, Vision Low | 8.5 | 2 / 1 → 1.2 | 90.3 |
+| Jinx | Hypercarry (High) | 80 | Comfortable | Wave clear Mid, CC Mid, Burst Low, Poke Low | 7 | 2 / 1 → 1.2 | 89.7 |
+| Smolder | Hypercarry (Mid) / Mobility (Mid) | 81.9 | Comfortable | Wave clear Mid, CC Low, Burst Mid | 6 | 2 / 1 → 1.2 | 89.6 |
+| Ashe | Utility (High) | 80 | Comfortable | CC High, Poke Mid, Vision High | 6.5 | 1 / 1 → 1.0 | 89.6 |
+| Corki | Mobility (Mid) / Lane bully (Low) | 97.5 | Learning | Wave clear Mid, Burst Mid, Poke Mid, Vision Mid | 8 | 2 / 1 → 1.2 | 89.2 |
+| Twitch | Hypercarry (High) | 80 | Comfortable | Wave clear Mid, CC Low, Burst High | 7 | 2 / 2 → 2.0 | 88.5 |
+| Miss Fortune | Lane bully (High) | 70 | Comfortable | Wave clear Low, CC Low, Burst High, Poke High | 8.5 | 1 / 1 → 1.0 | 87.4 |
+| Akshan | Mobility (High) / Utility (Low) | 100 | Never played | Wave clear Mid, Team utility Mid, Burst Mid, Vision Mid | 9 | 1 / 2 → 1.8 | 77.9 |
+| Aphelios | Hypercarry (High) / Utility (Low) | 80 | Never played | Wave clear Mid, CC Mid, Sustain Mid, Burst Mid, Poke Low, Vision Mid | 11 | 3 / 3 → 3.0 | 68.1 |
+| Draven | Lane bully (High) | 70 | Never played | CC Mid, Burst High | 5 | 3 / 3 → 3.0 | 58.7 |
+
+None of these 16 has Discomfort. Ranges match Riot's data: Caitlyn 650, Ashe and Senna 600; Lucian, Sivir and Akshan 500; Jinx 525; the rest 550.
+
+**Owner's notes (short):**
+- **Sivir:** only current main. Felt natural from day 1; great wave clear and CS; an underrated scaler.
+- **Caitlyn:** intuitive, long range; wants her as a main. Can still use traps better. Struggles vs very heavy tank comps.
+- **Tristana:** elo boosters' favorite, and the owner struggles against her. Gets fed on her but finds it oddly hard to carry. Could be a main.
+- **Senna:** easy; the hard part is scaling early and depending on teammates. Close to being a main.
+- **Lucian:** one of the most mobile ADCs. Easy once played enough; would rate him Low once a main.
+- **Ezreal:** one of the most fun. Farms safely with Q, but missing Qs is fatal. Struggles vs tanks.
+- **Jhin:** fun and easy; likes his lore. Struggles vs tanks and in long trades (reload).
+- **Jinx:** really easy. Many games, not recently; could be a main again.
+- **Smolder:** near-infinite scaling; enemies try to end early. Could become a main soon.
+- **Ashe:** hates the lack of mobility, but has had a lot of success. Useful even when behind. Rusty: 3–5 games to get back.
+- **Corki:** easy to pick up; could be Comfortable soon. Strong in lane.
+- **Twitch:** would rate him Low once a main.
+- **Miss Fortune:** crazy burst, really easy; her R is the champion. Poke High is the owner's call (her Q is below the 1,000-range rule).
+- **Akshan:** mostly a mid laner, so bot data may be thin. Not intuitive to the owner; OTPs seem to do very well.
+- **Aphelios:** hard to learn but rewarding; strong vs divers. OTPs likely beat his average.
+- **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
+
+### Draft cards (to confirm)
+
+Drafted from their kits, waiting for the owner's mastery, difficulty and corrections. Claude must confirm Riot difficulty and range from Riot's official data. The mages are mainly for the support tier list later.
+
+| Champion | Type (draft) | Traits (draft) | Range (draft) | Riot difficulty (draft) | Mastery |
+|---|---|---|---|---|---|
+| Viktor | Mage | CC Mid, Burst Mid, Wave clear High, Poke Mid | Medium (525) | High | Comfortable |
+| Hwei | Mage | CC High, Burst Mid, Wave clear Mid, Poke High | Medium (550) | High | Comfortable |
+| Lux | Mage | CC High, Team utility Mid, Burst Mid, Wave clear Mid, Poke Mid, Vision Mid | Medium (550) | Moderate | Comfortable |
+| Syndra | Mage | CC Mid, Burst High, Wave clear Mid | Medium (550) | High | Comfortable |
+| Xerath | Mage | Poke High, CC Mid, Burst Mid, Wave clear Mid | Medium (525) | High | Comfortable |
+| Ziggs | Mage | Poke High, Wave clear High, CC Mid, Burst Mid | Medium (550) | Moderate | Comfortable |
+| Kai'Sa | Hypercarry / Mobility | Burst Mid, Poke Mid, Wave clear Low | Medium (525) | Moderate | Learning or Never played? |
+| Kalista | Mobility | Team utility Mid, CC Mid, Vision Mid, Burst Mid, Wave clear Mid | Medium (525) | High | Learning or Never played? |
+| Kog'Maw | Hypercarry | Poke High, CC Low, Wave clear Mid | Short (500) | Moderate | Learning or Never played? |
+| Nilah | Mobility / Hypercarry | Team utility Mid, Sustain Mid, CC Mid, Wave clear Mid | Short (melee, 225) | Moderate | Learning or Never played? |
+| Samira | Mobility / Lane bully | Burst High, Wave clear Low | Short (500) | High | Learning or Never played? |
+| Varus | Lane bully / Utility | Poke High, CC High, Burst Mid, Wave clear Mid | Medium (575) | Moderate | Learning or Never played? |
+| Vayne | Hypercarry / Mobility | CC Mid, Burst Mid | Medium (550) | High | Learning or Never played? |
+| Xayah | Peel / Hypercarry | CC Mid, Burst Mid, Wave clear Mid | Medium (525) | Moderate | Learning or Never played? |
+| Yunara | To check (newer champion) | To check | To check | To check | Learning or Never played? |
+| Zeri | Mobility / Hypercarry, **Discomfort: Yes** | Poke Mid, CC Low, Wave clear Mid | Short (500) | Moderate | Never played ("I'll never play her") |
+
+**Fact-check notes (Riot Data Dragon 16.19.1, Oct 2, 2026), not yet applied to the brief:**
+- **Ranges:** all match except Zeri (Riot: 550, which is Medium, not Short 500) and Yunara (Riot: 575, Medium).
+- **Riot difficulty:** Data Dragon uses a 1–10 scale, which doesn't map exactly onto Riot's website levels (Low, Moderate, High). These disagree with the brief: Caitlyn and Ashe (Data Dragon 6 and 4, brief Low), Varus (2, draft Moderate), Samira (6, draft High), Nilah (10, draft Moderate). Yunara is 4. The owner should decide which official source counts.
+
+## Project board
+
+**Phase 0, setup:** all done.
+
+**Phase 1, data collector**
+- [x] Pick the regions to collect from
+- [x] Claude builds the collector for Diamond+ ADC and support games
+- [x] Store the Riot key safely as a GitHub secret (never in the code)
+- [ ] Run it for a few days and check that sample sizes grow
+- [ ] Define the OTP rule (share of recent games on one champion)
+
+**Phase 2, tier list website (first shareable version)**
+- [ ] Claude writes the scoring model as code
+- [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
+- [ ] Build the ADC tier list page: Pick Score, Meta Score, ban suggestions and Worth learning, plus games played, a sample-size label (low, medium, high) and trait badges for every champion
+- [ ] Publish on Vercel and share the link with one friend
+- [ ] Compare the output with the owner's manual picks for one patch and tune the weights
+
+**Phase 3, builds**
+- [ ] Decide the build rules (win rate vs pick rate, minimum games per build)
+- [ ] Champion page: best core items, boots, runes, skill order
+
+**Phase 4, draft helper**
+- [ ] Add matchup and synergy data from the collected matches
+- [ ] Draft screen: enter allies and enemies, get the top 3 picks with reasons, using champion traits (CC vs divers, sustain vs poke)
+
+**Phase 5, later**
+- [ ] Support tier list, then other roles
+- [ ] Apply for a production key if the site grows beyond friends
+
+## Open questions & improvements
+
+**Decide before or during Phase 2**
+- Which champions does the owner struggle against? Feeds the ban list; so far: Tristana.
+- Are the tier cutoffs and the stats floor right? Calibrate in Phase 2.
+- Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
+- Champions without a card: show them in the Meta Score with a "no card yet" label, and allow them in Worth learning.
+
+**Review once all ADC cards are done**
+- Review the types, type strengths, traits, priorities and levels together, and check that the rules still fit.
+- Should range affect Comfort? (Not for now.)
 
 ## Model versions
 
-- **v0.1** (Oct 1, 2026): first ADC model. Stats 40%, Comfort 50%, OTP delta 10%. LAN, KR, NA and EUW weighted ×2.
-- **v0.2** (Oct 1, 2026): win rate scored by distance from the Diamond+ average; ban rate moved to the ban list; smaller comfort gaps; 5 tiers with fixed cutoffs; stats floor at B; ban suggestions. Later versions will shift weight from Comfort to Stats as the owner improves.
-- **v0.3** (Oct 1, 2026): Comfort type points 100 / 90 / 80 / 70, Discomfort 30.
+Newest first. Each block of 10 versions is later folded into one summary row.
+
+- **v0.20** (Oct 2, 2026): secondary types get a strength too, applied before comparing with the main type; strength levels reviewed for all 16 cards; Ezreal's Poke lowered to Mid.
+- **v0.19** (Oct 2): type strength. Each main type gets a level: High 100%, Mid 97.5%, Low 95% of the type points.
+- **v0.18** (Oct 2): Hard CC and Soft CC merged into one CC trait (Medium priority, level shows its strength); levels renamed Low (0.5), Mid (1), High (1.5); 7 traits.
+- **v0.17** (Oct 2): new trait level Low (0.5); traits now move the Pick Score up to ±2.5 (kit weight 0.9, cap ±5 on Comfort).
+- **v0.16** (Oct 2): difficulty = 80% the owner's rating + 20% Riot's (was 70/30).
+- **v0.15** (Oct 2): Soft CC priority lowered from Medium (2) to Low (1).
+- **v0.14** (Oct 2): Comfort base = 40% type + 60% mastery (was 70/30); traits weighted by priority and a level per card; Comfort capped at 100.
+- **v0.13** (Oct 2): back to a simple Pick Score (Stats, Comfort, OTP); kit and difficulty adjustments live inside Comfort; each card shows one final Comfort.
+- **v0.12** (Oct 2): difficulty compared with Medium (2) instead of the card average.
+- **v0.11** (Oct 2): difficulty counts the owner's rating more than Riot's; full recipe summary added.
+- **v0.10** (Oct 2): new trait Poke.
+- **v0.1–v0.9** (Oct 1–2): first ADC model (Stats 40%, Comfort 50%, OTP 10%; LAN, KR, NA, EUW ×2); win rate scored by distance from the Diamond+ average; 5 tiers with fixed cutoffs and a stats floor at B; ban suggestions; types Mobility, Peel, Hypercarry, Utility, Mage, Lane bully; Discomfort as a switch; secondary types that can only help; type and trait fact-checks; traits and the kit adjustment; difficulty adjustment.
