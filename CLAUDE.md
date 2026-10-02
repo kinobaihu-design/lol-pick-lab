@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.30**, plus the owner's v0.31 changes (PDF to follow): Team utility means general usefulness to the team, and "eligible" means eligible bot-lane champions (ADCs and APCs). The Ashe example and the "Worth learning" leftovers are also fixed there. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.33**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -30,6 +30,8 @@ A free public website that ranks ADC and support champions each patch using the 
 2. **Build recommendations**: items, runes and skill order.
 3. **Draft helper**: enter the draft, get the top 3 picks with reasons.
 
+The final site covers 3 roles: bot lane (ADC and APC), jungle and support. Nothing is built for jungle or support until the bot-lane (ADC) tier list is done.
+
 ## How it works (all free)
 
 - **Data:** our own Diamond+ ranked solo/duo matches from the official Riot Games API, using a personal API key (100 requests / 2 min per region).
@@ -43,7 +45,7 @@ A free public website that ranks ADC and support champions each patch using the 
 - **Priority inside each routing region:** match downloads are split into four buckets (Americas, Europe, Asia, SEA). In each bucket the priority servers get about 70% (Americas: LAN and NA; Europe: EUW; Asia: KR), and the rest share 30%. SEA is split evenly. Recently active players are checked more often than inactive ones.
 - **Storage:** champion stats per patch, kept in this GitHub repository.
 - **Website:** hosted on Vercel's free plan, updates automatically when new data lands.
-- Early in a patch, last patch's data can be blended in until the sample is big enough.
+- **Patch blending:** early in a patch, each champion's stats blend in last patch's data. Share of this patch = `this patch's games ÷ (this patch's games + 1,000)`: 200 games → 17%, 1,000 → 50%, 3,000 → 75%, 9,000 → 90%. The site shows a label like "Data: 75% this patch".
 
 ## Data collector (Phase 1, built)
 
@@ -63,14 +65,14 @@ A free public website that ranks ADC and support champions each patch using the 
 - Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
-## Scoring model v0.30 (bot lane: ADC and APC): the full recipe
+## Scoring model v0.33 (bot lane: ADC and APC): the full recipe
 
 Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs and share the same trait average. Every part is scored 0–100, then weighted. The order of the steps:
 
 1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 **real** games this patch (counted before the double weight), ≥1% pick rate. The sample-size label (low, medium, high) also uses real games. The double weight (LAN, KR, NA, EUW ×2) still applies to all stats.
-2. **Stats (40%)** = 60% win rate points + 25% PBI + 15% pick rate.
+2. **Stats (40%)** = 75% win rate points + 25% pick rate. Win rate says how strong a champion is; pick rate says it's proven and popular. (PBI was removed in v0.33.)
    - Win rate points = `50 + 12.5 × (win rate − Diamond+ average)`, clamped to 0–100: +4% → 100, +2% → 75, average → 50, −2% → 25, −4% → 0. The Diamond+ average comes from our own data each patch (expected to sit above 50%; Lolalytics shows 52.27%).
-   - PBI and pick rate are ranked 0–100 among eligible champions. Ban rate is not in the Pick Score; it feeds PBI and the ban list.
+   - Pick rate is ranked 0–100 among the eligible bot-lane champions (ADCs and APCs). Ban rate isn't part of the Pick Score.
 3. **Comfort (50%)** comes from the champion cards (see "Comfort in detail"), capped at 100.
 4. **OTP (10%)** = OTP win rate − overall win rate, ranked 0–100 among eligible champions (raw OTP points), then pulled toward 50 by its reliability:
    - `OTP points = 50 + (raw OTP points − 50) × reliability`, where `reliability = OTP games ÷ (OTP games + 300)`. 100 OTP games → 25%; 300 → 50%; 1,000 → 77%; 3,000 → 91%.
@@ -80,12 +82,12 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
 6. **Tier:** S ≥ 80 · A 72–79.9 · B 64–71.9 · C 56–63.9 · D < 56. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The cutoffs and the floor are first guesses, calibrated in Phase 2 against the owner's gut ranking of 10 ADCs.
 
 **Other lists:**
-- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. For each champion, the app also calculates the Pick Score as if the owner's mastery were higher. It shows only the cases that would beat one of the owner's current top 3 picks. There are two kinds of advice:
+- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. For each champion the owner isn't a Main on, the app calculates its Pick Score at a target mastery: Never played and Below average as if Good; Average and Good one level up. It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Good"). There are two kinds of advice:
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
-- **Ban suggestions** (any role, separate from picks) = 60% PBI + 40% struggle list (100 if the owner struggles against it, otherwise 0). Whether the struggle list should count at all is an open question.
-- **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label.
+- **Ban suggestions** (any role, separate from picks), by data only: `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat.
+- **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label, and in the Growth advisor if they would beat one of the owner's top 3 picks.
 
 ### Comfort in detail
 
@@ -125,7 +127,7 @@ Comfort measures how much the owner likes a champion and how well they play it. 
 | Trait (8) | Owner's priority | Counts when the kit has… |
 |---|---|---|
 | Wave clear | High (3) | Clears a minion wave with abilities, without relying on items |
-| Team utility | High (3) | General usefulness to the team: shields, heals or speed for allies, and other help (clarified in v0.31) |
+| Team utility | High (3) | General usefulness to the team: helping allies, setting up plays, staying useful when behind (v0.31) |
 | AoE | High (3) | Damage that hits several champions at once |
 | CC | Medium (2) | Stuns, roots, knockups, knock asides, snares, slows. High = reliable hard CC that decides fights; Mid = situational hard CC, or hard CC plus slows; Low = slows only |
 | Sustain | Medium (2) | Healing or lifesteal in the kit |
@@ -226,7 +228,9 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 **Phase 2, tier list website (first shareable version)**
 - [ ] Claude writes the scoring model as code
 - [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
-- [ ] Build the ADC tier list page: Pick Score, Meta Score, ban suggestions and Worth learning (now the Growth advisor), plus games played, a sample-size label (low, medium, high) and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score
+- [ ] Build the bot-lane tier list page: Pick Score, Meta Score, ban suggestions and the Growth advisor, plus games played, a sample-size label (low, medium, high), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score
+- [ ] Follow Riot's developer rules: legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
+- [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
 - [ ] Publish on Vercel and share the link with one friend
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
@@ -239,19 +243,21 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - [ ] Draft screen: enter allies and enemies, get the top 3 picks with reasons, using champion traits (CC vs divers, sustain vs poke)
 
 **Phase 5, later**
-- [ ] Support tier list, then other roles
+- [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
 - [ ] Apply for a production key if the site grows beyond friends
 
 ## Open questions & improvements
 
 **Decide before or during Phase 2**
-- **Ban list:** should the personal "struggle against" list count at all, or should bans be pure data (PBI)? The owner's bans in the last 3 months were only Tristana, and they'd also ban Yunara or Jinx because those feel broken. Test in Phase 2: does PBI rank these three near the top?
+- **Ban list check:** the owner's bans in the last 3 months were Tristana, and they'd also ban Yunara or Jinx. Does the Ban threat ranking put them near the top? (Bans go by data, not by these examples.)
 - Are the tier cutoffs and the stats floor right? Calibrate in Phase 2.
 - Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
 - **Are Pick Scores spread enough?** Comfort for the owner's pool sits mostly between 86 and 100, so Stats should do most of the separating. Check with real data and widen the gaps if the tiers feel too similar.
 - Review all cards' traits with the "at least Low" rule (only Lucian is done so far), and fill in mastery and difficulty for any remaining draft cards.
 - **Mage cards:** confirm Ziggs's Wave clear (assumed High) and Xerath's difficulty (set between Medium and High).
 - Flexibility bonus (beta, Varus only): check in Phase 2 whether it's worth keeping or extending.
+- **Calibration list** (the owner's opinion, written Oct 3 before any data): the strongest bot-lane champions this meta, unordered: Jinx, Hwei, Lux, Tristana, Xayah, Caitlyn, Viktor, Ziggs, Twitch, Yunara, Zeri, Ashe, Draven. Test in Phase 2: do they land at the top of the Meta Score (data only)?
+- **Cards per role (Phase 2 design note from the owner):** store champion cards per champion + role, with the same card structure, but each role has its own types, trait list and priorities. A champion can have a bot-lane card and a support card.
 
 **Review once all ADC cards are done**
 - Review the types, type strengths, traits, priorities and levels together, and check that the rules still fit.
@@ -261,6 +267,9 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.33** (Oct 3, 2026): PBI removed, so Stats = 75% win rate points + 25% pick rate. Bans by data only: Ban threat = (win rate − Diamond+ average) × pick rate. Growth advisor rule (Never played and Below average → as if Good; Average and Good → one level up; shown if it beats the #3 pick). The final site covers bot lane, jungle and support.
+- **v0.32** (Oct 3, 2026): patch blending, where share of this patch = this patch's games ÷ (this patch's games + 1,000) and the rest comes from last patch, with a data-freshness label per champion. Season totals for OTPs stored (current and previous season).
+- **v0.31** (Oct 3, 2026): Team utility means general usefulness to the team. Trait average and Stats ranks use all eligible bot-lane champions (ADCs and APCs).
 - **v0.30** (Oct 3, 2026): bot lane includes APCs. The 6 mage cards (Lux, Ziggs, Syndra, Hwei, Viktor, Xerath) join the same list and the same trait average as the ADCs (13.7). Every card recalculated.
 - **v0.20–v0.29** (Oct 2–3, 2026): secondary types get a strength; real games for the 1,000-game filter; Riot difficulty from the 1–10 game-data number, with the website as backup; range groups (Short ≤500, Medium 525–575, Long 600+) and a range adjustment (±0.5 Comfort); OTP rule (55% of recent games, 50+ games) and OTP reliability; mastery reworked (Main 100, Good 90, Average 80, Below average 70, Never played 60) with matching difficulty factors; Discomfort removed; Growth advisor; every trait at least Low unless absent; new trait AoE (High); flexibility bonus beta (Varus); the owner's difficulty is a locked base rating.
 - **v0.10–v0.19** (Oct 2, 2026): new trait Poke; Comfort base 40% type + 60% mastery, capped at 100; kit and difficulty adjustments inside Comfort (traits up to ±2.5, difficulty up to ±1.5 on the Pick Score); difficulty = 80% the owner's rating + 20% Riot's, compared with Medium (2); traits weighted by priority and level (Low 0.5, Mid 1, High 1.5); Hard and Soft CC merged into one CC trait; type strength (High 100%, Mid 97.5%, Low 95%).
