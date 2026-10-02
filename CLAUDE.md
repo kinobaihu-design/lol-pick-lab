@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.20**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.21**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -57,11 +57,11 @@ A free public website that ranks ADC and support champions each patch using the 
 - Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
-## Scoring model v0.20 (ADC): the full recipe
+## Scoring model v0.21 (ADC): the full recipe
 
 Every part is scored 0–100, then weighted. The order of the steps:
 
-1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 games this patch, ≥1% pick rate.
+1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 **real** games this patch (counted before the double weight), ≥1% pick rate. The sample-size label (low, medium, high) also uses real games. The double weight (LAN, KR, NA, EUW ×2) still applies to all stats.
 2. **Stats (40%)** = 60% win rate points + 25% PBI + 15% pick rate.
    - Win rate points = `50 + 12.5 × (win rate − Diamond+ average)`, clamped to 0–100: +4% → 100, +2% → 75, average → 50, −2% → 25, −4% → 0. The Diamond+ average comes from our own data each patch (expected to sit above 50%; Lolalytics shows 52.27%).
    - PBI and pick rate are ranked 0–100 among eligible ADCs. Ban rate is not in the Pick Score; it feeds PBI and the ban list.
@@ -98,7 +98,7 @@ Comfort measures how much the owner likes a champion and how well they play it. 
 
 **Step 2: mastery points.** Main 100 · Comfortable 95 · Learning 80 · Never played 60.
 
-**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average is recalculated each patch from the eligible ADCs (7.5 on the current 16 cards). An average champion gets 0, so scores don't inflate.
+**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average is recalculated each patch from the eligible ADCs (7.175 on the current 20 cards; the brief shows it rounded as 7.2). An average champion gets 0, so scores don't inflate.
 - Trait score = sum of `priority × level` for each trait the champion has.
 - Levels: Low 0.5 · Mid 1 · High 1.5. A trait that defines the champion's type isn't listed again.
 
@@ -113,35 +113,45 @@ Comfort measures how much the owner likes a champion and how well they play it. 
 | Vision | Low (1) | Reveals areas or enemies |
 
 **Step 4: difficulty adjustment** = `−3 × (difficulty − 2) × mastery factor`, capped at ±3 on Comfort (±1.5 on the Pick Score).
-- Difficulty = 80% the owner's rating + 20% Riot's (Low 1, Medium 2, High 3). It's compared with Medium (2), so harder means minus, easier means plus, and adding cards never changes other champions.
+- Difficulty = 80% the owner's rating + 20% Riot's (Low 1, Medium 2, High 3). **Riot's rating comes from the 1–10 `info.difficulty` number in Riot's game data (Data Dragon): 1–3 Low, 4–6 Moderate, 7–10 High.** It's compared with Medium (2), so harder means minus, easier means plus, and adding cards never changes other champions.
 - Mastery factor (mastery softens it, never to zero): Never played 100% · Learning 75% · Comfortable 50% · Main 25%.
 
 **Range** (on the card, not in the score): base attack range; short < 500, medium 500–599, long ≥ 600.
 
 ## Champion cards (ADC)
 
-The cards hold the owner's inputs. The Comfort column is the brief's result and serves as test data for the scoring code, which must reproduce it within rounding. Type pts include strength and the secondary-type bonus.
+The cards hold the owner's inputs. The Comfort column is the brief's result and serves as test data for the scoring code, which must reproduce it within rounding (Claude's recalculation of all 20 matched within 0.05). Type pts include strength and the secondary-type bonus. Riot difficulty here is copied from the brief; see "Pending fact-check" below.
 
 | Champion | Type (strength) / secondary (strength) | Type pts | Mastery | Traits (level) | Trait score | Difficulty Riot / mine → final | Comfort |
 |---|---|---|---|---|---|---|---|
-| Sivir | Peel (High) / Utility | 90 | Main | Team utility High, Wave clear High, Poke Mid, Sustain Low | 12 | 1.5 / 1 → 1.1 | 100 (100.7 capped) |
-| Caitlyn | Mobility (Mid) / Lane bully (Mid) | 97.5 | Comfortable | Wave clear Mid, CC Mid, Burst Mid, Poke Mid, Vision Mid | 10 | 1 / 1.5 → 1.4 | 99.1 |
-| Tristana | Mobility (High) / Hypercarry (Low) | 100 | Comfortable | Wave clear Mid, CC Low, Burst High | 7 | 2 / 2 → 2.0 | 96.5 |
-| Senna | Utility (High) / Hypercarry (Mid) | 80 | Comfortable | Team utility High, CC Mid, Sustain High, Poke Low | 10.5 | 3 / 1 → 1.4 | 92.6 |
-| Lucian | Mobility (High) / Lane bully (Low) | 100 | Comfortable | Burst Mid, Vision Low | 2.5 | 2 / 2 → 2.0 | 92.5 |
-| Ezreal | Mobility (High) | 100 | Comfortable | Poke Mid | 2 | 3 / 2.5 → 2.6 | 91.1 |
-| Jhin | Utility (Mid) | 78 | Comfortable | CC High, Burst High, Poke Mid, Vision Low | 8.5 | 2 / 1 → 1.2 | 90.3 |
-| Jinx | Hypercarry (High) | 80 | Comfortable | Wave clear Mid, CC Mid, Burst Low, Poke Low | 7 | 2 / 1 → 1.2 | 89.7 |
-| Smolder | Hypercarry (Mid) / Mobility (Mid) | 81.9 | Comfortable | Wave clear Mid, CC Low, Burst Mid | 6 | 2 / 1 → 1.2 | 89.6 |
-| Ashe | Utility (High) | 80 | Comfortable | CC High, Poke Mid, Vision High | 6.5 | 1 / 1 → 1.0 | 89.6 |
-| Corki | Mobility (Mid) / Lane bully (Low) | 97.5 | Learning | Wave clear Mid, Burst Mid, Poke Mid, Vision Mid | 8 | 2 / 1 → 1.2 | 89.2 |
-| Twitch | Hypercarry (High) | 80 | Comfortable | Wave clear Mid, CC Low, Burst High | 7 | 2 / 2 → 2.0 | 88.5 |
-| Miss Fortune | Lane bully (High) | 70 | Comfortable | Wave clear Low, CC Low, Burst High, Poke High | 8.5 | 1 / 1 → 1.0 | 87.4 |
-| Akshan | Mobility (High) / Utility (Low) | 100 | Never played | Wave clear Mid, Team utility Mid, Burst Mid, Vision Mid | 9 | 1 / 2 → 1.8 | 77.9 |
-| Aphelios | Hypercarry (High) / Utility (Low) | 80 | Never played | Wave clear Mid, CC Mid, Sustain Mid, Burst Mid, Poke Low, Vision Mid | 11 | 3 / 3 → 3.0 | 68.1 |
-| Draven | Lane bully (High) | 70 | Never played | CC Mid, Burst High | 5 | 3 / 3 → 3.0 | 58.7 |
+| Sivir | Peel (High) / Utility | 90 | Main | Team utility High, Wave clear High, Poke Mid, Sustain Low | 12 | 1.5 / 1 → 1.1 | 100 (101.0 capped) |
+| Caitlyn | Mobility (Mid) / Lane bully (Mid) | 97.5 | Comfortable | Wave clear Mid, CC Mid, Burst Mid, Poke Mid, Vision Mid | 10 | 1 / 1.5 → 1.4 | 99.4 |
+| Tristana | Mobility (High) / Hypercarry (Low) | 100 | Comfortable | Wave clear Mid, CC Low, Burst High | 7 | 2 / 2 → 2.0 | 96.8 |
+| Senna | Utility (High) / Hypercarry (Mid) | 80 | Comfortable | Team utility High, CC Mid, Sustain High, Poke Low | 10.5 | 3 / 1 → 1.4 | 92.9 |
+| Lucian | Mobility (High) / Lane bully (Low) | 100 | Comfortable | Burst Mid, Vision Low | 2.5 | 2 / 2 → 2.0 | 92.8 |
+| Ezreal | Mobility (High) | 100 | Comfortable | Poke Mid | 2 | 3 / 2.5 → 2.6 | 91.4 |
+| Jhin | Utility (Mid) | 78 | Comfortable | CC High, Burst High, Poke Mid, Vision Low | 8.5 | 2 / 1 → 1.2 | 90.6 |
+| Jinx | Hypercarry (High) | 80 | Comfortable | Wave clear Mid, CC Mid, Burst Low, Poke Low | 7 | 2 / 1 → 1.2 | 90.0 |
+| Smolder | Hypercarry (Mid) / Mobility (Mid) | 81.9 | Comfortable | Wave clear Mid, CC Low, Burst Mid | 6 | 2 / 1 → 1.2 | 89.9 |
+| Ashe | Utility (High) | 80 | Comfortable | CC High, Poke Mid, Vision High | 6.5 | 1 / 1 → 1.0 | 89.9 |
+| Corki | Mobility (Mid) / Lane bully (Low) | 97.5 | Learning | Wave clear Mid, Burst Mid, Poke Mid, Vision Mid | 8 | 2 / 1 → 1.2 | 89.5 |
+| Twitch | Hypercarry (High) | 80 | Comfortable | Wave clear Mid, CC Low, Burst High | 7 | 2 / 2 → 2.0 | 88.8 |
+| Miss Fortune | Lane bully (High) | 70 | Comfortable | Wave clear Low, CC Low, Burst High, Poke High | 8.5 | 1 / 1 → 1.0 | 87.7 |
+| Kalista | Mobility (High) | 100 | Learning | Wave clear Low, Team utility Mid, CC Mid, Burst Low, Vision Mid | 8.5 | 3 / 3 → 3.0 | 86.9 |
+| Kai'Sa | Hypercarry (Mid) / Mobility (Mid) | 81.9 | Learning | Wave clear Low, Burst Mid, Poke Low | 4.5 | 2 / 2 → 2.0 | 78.4 |
+| Yunara | Hypercarry (High) / Mobility (Low) | 83 | Learning | Wave clear Mid, CC Low | 4 | 2 / 2 → 2.0 | 78.3 |
+| Akshan | Mobility (High) / Utility (Low) | 100 | Never played | Wave clear Mid, Team utility Mid, Burst Mid, Vision Mid | 9 | 1 / 2 → 1.8 | 78.2 |
+| Aphelios | Hypercarry (High) / Utility (Low) | 80 | Never played | Wave clear Mid, CC Mid, Sustain Mid, Burst Mid, Poke Low, Vision Mid | 11 | 3 / 3 → 3.0 | 68.4 |
+| Draven | Lane bully (High) | 70 | Never played | CC Mid, Burst High | 5 | 3 / 3 → 3.0 | 59.0 |
+| Zeri | **Discomfort** (Mobility / Hypercarry) | 30 | Never played | Wave clear Mid, CC Low, Poke Mid (draft, to review later) | 6 | 2 / 2 (Riot's used for now) → 2.0 | 46.9 |
 
-None of these 16 has Discomfort. Ranges match Riot's data: Caitlyn 650, Ashe and Senna 600; Lucian, Sivir and Akshan 500; Jinx 525; the rest 550.
+Only Zeri has Discomfort. Ranges match Riot's data: Caitlyn 650; Ashe and Senna 600; Yunara 575; Jinx, Kalista and Kai'Sa 525; Lucian, Sivir and Akshan 500; the rest 550 (all Medium except the Long ones: Caitlyn, Ashe, Senna).
+
+**Pending fact-check: Riot difficulty under the v0.21 rule.** Riot's data gives Yunara 4/10 = Moderate (2), which confirms the brief's "2 (to confirm)". Four existing cards don't follow the rule yet, and the owner must confirm before the brief changes:
+- **Caitlyn:** 6/10 = Moderate (2); the brief uses 1. Comfort would become 99.1 (from 99.4).
+- **Ashe:** 4/10 = Moderate (2); the brief uses 1. Comfort would become 89.6 (from 89.9).
+- **Sivir:** 4/10 = Moderate (2); the brief uses 1.5. Comfort stays 100 because of the cap.
+- **Akshan:** Riot's data has no rating (0). The brief uses Low (1); a fallback rule is needed.
 
 **Owner's notes (short):**
 - **Sivir:** only current main. Felt natural from day 1; great wave clear and CS; an underrated scaler.
@@ -157,36 +167,34 @@ None of these 16 has Discomfort. Ranges match Riot's data: Caitlyn 650, Ashe and
 - **Corki:** easy to pick up; could be Comfortable soon. Strong in lane.
 - **Twitch:** would rate him Low once a main.
 - **Miss Fortune:** crazy burst, really easy; her R is the champion. Poke High is the owner's call (her Q is below the 1,000-range rule).
+- **Kalista:** one of the most mobile ADCs, with Lucian. Hard now; should get easier (Mid or Low) as the owner learns her.
+- **Kai'Sa:** could be easy once a main (difficulty Low then).
+- **Yunara:** most-played ADC in the first data; a newer champion. Mobility is Low because she only dashes during R. Could be Low difficulty once learned.
 - **Akshan:** mostly a mid laner, so bot data may be thin. Not intuitive to the owner; OTPs seem to do very well.
 - **Aphelios:** hard to learn but rewarding; strong vs divers. OTPs likely beat his average.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
+- **Zeri:** "I'll never play her." Card to review later.
 
 ### Draft cards (to confirm)
 
-Drafted from their kits, waiting for the owner's mastery, difficulty and corrections. Claude must confirm Riot difficulty and range from Riot's official data. The mages are mainly for the support tier list later.
+Drafted from their kits, waiting for the owner's mastery, difficulty and corrections. The mages are mainly for the support tier list later. Range and Riot difficulty below are **confirmed from Riot's data** (Data Dragon 16.19.1) using the v0.21 rule. Values that differ from the brief's draft are marked *(brief: …)*.
 
-| Champion | Type (draft) | Traits (draft) | Range (draft) | Riot difficulty (draft) | Mastery |
+| Champion | Type (draft) | Traits (draft) | Range (Riot) | Riot difficulty (Riot) | Mastery |
 |---|---|---|---|---|---|
-| Viktor | Mage | CC Mid, Burst Mid, Wave clear High, Poke Mid | Medium (525) | High | Comfortable |
-| Hwei | Mage | CC High, Burst Mid, Wave clear Mid, Poke High | Medium (550) | High | Comfortable |
-| Lux | Mage | CC High, Team utility Mid, Burst Mid, Wave clear Mid, Poke Mid, Vision Mid | Medium (550) | Moderate | Comfortable |
-| Syndra | Mage | CC Mid, Burst High, Wave clear Mid | Medium (550) | High | Comfortable |
-| Xerath | Mage | Poke High, CC Mid, Burst Mid, Wave clear Mid | Medium (525) | High | Comfortable |
-| Ziggs | Mage | Poke High, Wave clear High, CC Mid, Burst Mid | Medium (550) | Moderate | Comfortable |
-| Kai'Sa | Hypercarry / Mobility | Burst Mid, Poke Mid, Wave clear Low | Medium (525) | Moderate | Learning or Never played? |
-| Kalista | Mobility | Team utility Mid, CC Mid, Vision Mid, Burst Mid, Wave clear Mid | Medium (525) | High | Learning or Never played? |
-| Kog'Maw | Hypercarry | Poke High, CC Low, Wave clear Mid | Short (500) | Moderate | Learning or Never played? |
-| Nilah | Mobility / Hypercarry | Team utility Mid, Sustain Mid, CC Mid, Wave clear Mid | Short (melee, 225) | Moderate | Learning or Never played? |
-| Samira | Mobility / Lane bully | Burst High, Wave clear Low | Short (500) | High | Learning or Never played? |
-| Varus | Lane bully / Utility | Poke High, CC High, Burst Mid, Wave clear Mid | Medium (575) | Moderate | Learning or Never played? |
-| Vayne | Hypercarry / Mobility | CC Mid, Burst Mid | Medium (550) | High | Learning or Never played? |
-| Xayah | Peel / Hypercarry | CC Mid, Burst Mid, Wave clear Mid | Medium (525) | Moderate | Learning or Never played? |
-| Yunara | To check (newer champion) | To check | To check | To check | Learning or Never played? |
-| Zeri | Mobility / Hypercarry, **Discomfort: Yes** | Poke Mid, CC Low, Wave clear Mid | Short (500) | Moderate | Never played ("I'll never play her") |
+| Viktor | Mage | CC Mid, Burst Mid, Wave clear High, Poke Mid | Medium (525) | High (9) | Comfortable |
+| Hwei | Mage | CC High, Burst Mid, Wave clear Mid, Poke High | Medium (550) | High (9) | Comfortable |
+| Lux | Mage | CC High, Team utility Mid, Burst Mid, Wave clear Mid, Poke Mid, Vision Mid | Medium (550) | Moderate (5) | Comfortable |
+| Syndra | Mage | CC Mid, Burst High, Wave clear Mid | Medium (550) | High (8) | Comfortable |
+| Xerath | Mage | Poke High, CC Mid, Burst Mid, Wave clear Mid | Medium (525) | High (8) | Comfortable |
+| Ziggs | Mage | Poke High, Wave clear High, CC Mid, Burst Mid | Medium (550) | Moderate (4) | Comfortable |
+| Kog'Maw | Hypercarry | Poke High, CC Low, Wave clear Mid | Medium (500) *(brief: Short)* | Moderate (6) | Learning or Never played? |
+| Nilah | Mobility / Hypercarry | Team utility Mid, Sustain Mid, CC Mid, Wave clear Mid | Short (melee, 225) | High (10) *(brief: Moderate)* | Learning or Never played? |
+| Samira | Mobility / Lane bully | Burst High, Wave clear Low | Medium (500) *(brief: Short)* | Moderate (6) *(brief: High)* | Learning or Never played? |
+| Varus | Lane bully / Utility | Poke High, CC High, Burst Mid, Wave clear Mid | Medium (575) | Low (2) *(brief: Moderate)* | Learning or Never played? |
+| Vayne | Hypercarry / Mobility | CC Mid, Burst Mid | Medium (550) | High (8) | Learning or Never played? |
+| Xayah | Peel / Hypercarry | CC Mid, Burst Mid, Wave clear Mid | Medium (525) | Moderate (5) | Learning or Never played? |
 
-**Fact-check notes (Riot Data Dragon 16.19.1, Oct 2, 2026), not yet applied to the brief:**
-- **Ranges:** all match except Zeri (Riot: 550, which is Medium, not Short 500) and Yunara (Riot: 575, Medium).
-- **Riot difficulty:** Data Dragon uses a 1–10 scale, which doesn't map exactly onto Riot's website levels (Low, Moderate, High). These disagree with the brief: Caitlyn and Ashe (Data Dragon 6 and 4, brief Low), Varus (2, draft Moderate), Samira (6, draft High), Nilah (10, draft Moderate). Yunara is 4. The owner should decide which official source counts.
+Range note: the brief's rule is short < 500 and medium 500–599, so exactly 500 (Kog'Maw, Samira, and also Lucian, Sivir, Akshan) is Medium. The draft calls Kog'Maw and Samira "Short (500)", which conflicts with the rule.
 
 ## Project board
 
@@ -234,15 +242,7 @@ Drafted from their kits, waiting for the owner's mastery, difficulty and correct
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.21** (Oct 2, 2026): the 1,000-game filter and the sample-size label use real games (before the double weight); Riot difficulty comes from the 1–10 game-data number (1–3 Low, 4–6 Moderate, 7–10 High); Zeri's and Yunara's ranges corrected to Medium. Four new finished cards: Kalista, Kai'Sa, Yunara, Zeri (trait average now 7.2).
 - **v0.20** (Oct 2, 2026): secondary types get a strength too, applied before comparing with the main type; strength levels reviewed for all 16 cards; Ezreal's Poke lowered to Mid.
-- **v0.19** (Oct 2): type strength. Each main type gets a level: High 100%, Mid 97.5%, Low 95% of the type points.
-- **v0.18** (Oct 2): Hard CC and Soft CC merged into one CC trait (Medium priority, level shows its strength); levels renamed Low (0.5), Mid (1), High (1.5); 7 traits.
-- **v0.17** (Oct 2): new trait level Low (0.5); traits now move the Pick Score up to ±2.5 (kit weight 0.9, cap ±5 on Comfort).
-- **v0.16** (Oct 2): difficulty = 80% the owner's rating + 20% Riot's (was 70/30).
-- **v0.15** (Oct 2): Soft CC priority lowered from Medium (2) to Low (1).
-- **v0.14** (Oct 2): Comfort base = 40% type + 60% mastery (was 70/30); traits weighted by priority and a level per card; Comfort capped at 100.
-- **v0.13** (Oct 2): back to a simple Pick Score (Stats, Comfort, OTP); kit and difficulty adjustments live inside Comfort; each card shows one final Comfort.
-- **v0.12** (Oct 2): difficulty compared with Medium (2) instead of the card average.
-- **v0.11** (Oct 2): difficulty counts the owner's rating more than Riot's; full recipe summary added.
-- **v0.10** (Oct 2): new trait Poke.
-- **v0.1–v0.9** (Oct 1–2): first ADC model (Stats 40%, Comfort 50%, OTP 10%; LAN, KR, NA, EUW ×2); win rate scored by distance from the Diamond+ average; 5 tiers with fixed cutoffs and a stats floor at B; ban suggestions; types Mobility, Peel, Hypercarry, Utility, Mage, Lane bully; Discomfort as a switch; secondary types that can only help; type and trait fact-checks; traits and the kit adjustment; difficulty adjustment.
+- **v0.10–v0.19** (Oct 2, 2026): new trait Poke; Comfort base 40% type + 60% mastery, capped at 100; kit and difficulty adjustments inside Comfort (traits up to ±2.5, difficulty up to ±1.5 on the Pick Score); difficulty = 80% the owner's rating + 20% Riot's, compared with Medium (2); traits weighted by priority and level (Low 0.5, Mid 1, High 1.5); Hard and Soft CC merged into one CC trait; type strength (High 100%, Mid 97.5%, Low 95%).
+- **v0.1–v0.9** (Oct 1–2, 2026): first ADC model (Stats 40%, Comfort 50%, OTP 10%; LAN, KR, NA, EUW ×2); win rate scored by distance from the Diamond+ average; 5 tiers with fixed cutoffs and a stats floor at B; ban suggestions; types Mobility, Peel, Hypercarry, Utility, Mage, Lane bully; Discomfort as a switch; secondary types that can only help; type and trait fact-checks; traits and the kit adjustment; difficulty adjustment.
