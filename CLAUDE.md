@@ -52,6 +52,7 @@ A free public website that ranks ADC and support champions each patch using the 
 - Data lives on the `data` branch, replaced each save with no history. `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as scrambled codes.
 - Bans count once per game. Ban rate = games banned ÷ games counted.
 - Skill order isn't collected yet. It's planned for Phase 3, since it needs an extra request per game.
+- Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
 ## Scoring model v0.3 (ADC)

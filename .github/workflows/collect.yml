@@ -27,6 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Runs first, so it still happens when the collection fails.
+      - name: Keep the schedule active
+        continue-on-error: true
+        env:
+          KEEP_ACTIVE_DAYS: "30"
+        run: bash scripts/keep_active.sh
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
