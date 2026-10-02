@@ -289,6 +289,9 @@ class Run:
                 name: {"games_counted": sum(p["games"]),
                        "diamond_plus_average_win_rate": win_rate(p["participants"])}
                 for name, p in sorted(self.store.patches.items())},
+            "seasons": {
+                name: {"players": len(s["players"]), "bot_and_support_champions": len(s["champions"])}
+                for name, s in sorted(self.store.seasons.items())},
         }
 
     def save(self, final):

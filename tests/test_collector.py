@@ -1,6 +1,7 @@
 """Offline checks with a made-up game (no Riot key needed)."""
 
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -56,7 +57,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(len(adc["allies"]), 4)
         self.assertEqual(len(adc["enemies"]), 5)
         self.assertIn("109:UTILITY", adc["enemies"])
-        self.assertEqual(patch["players"][scramble("player-3")], {"103": [1, 1]})
+        self.assertEqual(patch["players"][scramble("player-3")], {"103": [1, 1], "103:B": [1, 1]})
         self.assertEqual(store.summary("16.19")["diamond_plus_average_win_rate"], 50.0)
 
     def test_skips(self):
@@ -103,6 +104,69 @@ class StoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             store.save(root, {})
             self.assertEqual(sorted(os.listdir(os.path.join(root, "patches"))), ["16.17", "16.18", "16.19"])
+
+
+class SeasonTests(unittest.TestCase):
+    def _store_with_bot_champions(self):
+        """A store where champion 103 (bot lane) and 109 (support) qualify."""
+        store = Store()
+        everyone = {scramble("player-%d" % i) for i in range(10)}
+        for n in range(config.SEASON_CHAMPION_MIN_GAMES):
+            store.add_match(compact_match(fake_match(), "NA1_%d" % n, "NA1"), everyone)
+        return store, everyone
+
+    def test_counts_totals_and_bot_support_champions(self):
+        store, _ = self._store_with_bot_champions()
+        season = store.seasons["16"]
+        self.assertEqual(season["champions"], {str(100 + i) for i in range(10)} & season["champions"])
+        self.assertIn("103", season["champions"])   # always played bot lane
+        self.assertIn("109", season["champions"])   # always played support
+        self.assertNotIn("100", season["champions"])  # always top lane
+        adc = season["players"][scramble("player-3")]
+        top = season["players"][scramble("player-0")]
+        games = config.SEASON_CHAMPION_MIN_GAMES
+        self.assertEqual(adc["all"], [games, games])
+        # The champion qualifies after its 200th game, which is then counted.
+        self.assertEqual(adc["103"], [1, 1])
+        self.assertEqual(adc["103:B"], [1, 1])
+        self.assertEqual(top["all"], [games, games])
+        self.assertNotIn("100", top)  # top-lane champion: total only
+        patch_player = store.patches["16.19"]["players"][scramble("player-3")]
+        self.assertEqual(patch_player["103"], [games, games])
+        self.assertEqual(patch_player["103:B"], [games, games])
+
+    def test_new_season_starts_fresh(self):
+        store, everyone = self._store_with_bot_champions()
+        store.add_match(compact_match(fake_match(version="17.1.1"), "NA1_99999", "NA1"), everyone)
+        self.assertEqual(store.seasons["17"]["players"][scramble("player-3")]["all"], [1, 1])
+        self.assertEqual(store.seasons["16"]["players"][scramble("player-3")]["all"][0],
+                         config.SEASON_CHAMPION_MIN_GAMES)
+
+    def test_seed_from_patch_files_and_save_load(self):
+        store, _ = self._store_with_bot_champions()
+        games = config.SEASON_CHAMPION_MIN_GAMES
+        with tempfile.TemporaryDirectory() as root:
+            store.save(root, {})
+            # Pretend the season file never existed: it is rebuilt from the patch files.
+            shutil.rmtree(os.path.join(root, "season"))
+            seeded = Store.load(root)
+            player = seeded.seasons["16"]["players"][scramble("player-3")]
+            self.assertEqual(player["all"], [games, games])
+            self.assertEqual(player["103"], [games, games])
+            self.assertEqual(player["103:B"], [games, games])
+            self.assertNotIn("100", seeded.seasons["16"]["players"][scramble("player-0")])
+            seeded.save(root, {})
+            again = Store.load(root)
+            self.assertEqual(again.seasons["16"]["players"][scramble("player-3")]["all"], [games, games])
+
+    def test_keeps_two_seasons(self):
+        store = Store()
+        everyone = {scramble("player-%d" % i) for i in range(10)}
+        for major in (14, 15, 16):
+            store.add_match(compact_match(fake_match(version="%d.1.1" % major), "NA1_%d" % major, "NA1"), everyone)
+        with tempfile.TemporaryDirectory() as root:
+            store.save(root, {})
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "season"))), ["15", "16"])
 
 
 class ConfigTests(unittest.TestCase):

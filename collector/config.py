@@ -37,6 +37,17 @@ PRIORITY_SERVERS = {
 
 # Roles that get full detail (items, runes, allies, enemies).
 DETAIL_ROLES = ("BOTTOM", "UTILITY")
+# Short role tags used in the player files: "22:B" = Ashe games in bot lane.
+ROLE_TAGS = {"BOTTOM": "B", "UTILITY": "S"}
+
+# Season totals per player (for the OTP rule). A season is the first part of
+# the patch number (16.19 -> season 16). Per-champion counts are kept only for
+# bot-lane and support champions: at least SEASON_CHAMPION_MIN_GAMES games in a
+# patch of the season, with at least SEASON_CHAMPION_MIN_SHARE of them in bot lane or support.
+# Once a champion qualifies it stays for the rest of the season.
+SEASON_CHAMPION_MIN_GAMES = 200
+SEASON_CHAMPION_MIN_SHARE = 0.10
+KEEP_SEASONS = 2
 
 # Personal key limits per routing value: (requests, seconds). Riot's response
 # headers replace these if they differ. We stay a little under them.
