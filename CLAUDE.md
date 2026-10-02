@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.30**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.30**, plus the owner's v0.31 changes (PDF to follow): Team utility means general usefulness to the team, and "eligible" means eligible bot-lane champions (ADCs and APCs). The Ashe example and the "Worth learning" leftovers are also fixed there. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -112,14 +112,14 @@ Comfort measures how much the owner likes a champion and how well they play it. 
 | Below average | 70 | 80% | 25% | Knows how it works; can jump in and try to win |
 | Never played | 60 | 100% | 0% | Knows nothing about it; would struggle |
 
-**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average covers all bot-lane cards, ADCs and APCs together: 13.656 on the current 32 cards, shown in the brief as 13.7. An average champion gets 0, so scores don't inflate.
+**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average is recalculated each patch from the eligible bot-lane champions, ADCs and APCs together (v0.31). Until real data exists it's the average of all 32 cards: 13.656, shown in the brief as 13.7. An average champion gets 0, so scores don't inflate.
 - Trait score = sum of `priority × level`. Levels: Low 0.5 · Mid 1 · High 1.5.
 - **Every trait gets at least Low if the champion has any of it.** A trait is left empty only when it's truly absent, which should be the exception. A trait that defines the champion's type isn't listed again.
 
 | Trait (8) | Owner's priority | Counts when the kit has… |
 |---|---|---|
 | Wave clear | High (3) | Clears a minion wave with abilities, without relying on items |
-| Team utility | High (3) | Shields, heals or speed for allies (whether "Low" can also mean general usefulness is an open question) |
+| Team utility | High (3) | General usefulness to the team: shields, heals or speed for allies, and other help (clarified in v0.31) |
 | AoE | High (3) | Damage that hits several champions at once |
 | CC | Medium (2) | Stuns, roots, knockups, knock asides, snares, slows. High = reliable hard CC that decides fights; Mid = situational hard CC, or hard CC plus slows; Low = slows only |
 | Sustain | Medium (2) | Healing or lifesteal in the kit |
@@ -244,7 +244,6 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
 - **Are Pick Scores spread enough?** Comfort for the owner's pool sits mostly between 86 and 100, so Stats should do most of the separating. Check with real data and widen the gaps if the tiers feel too similar.
 - Review all cards' traits with the "at least Low" rule (only Lucian is done so far), and fill in mastery and difficulty for any remaining draft cards.
-- **Team utility:** the rule says helping allies directly, but many cards now have "Team utility Low" (Caitlyn, Jinx, Jhin and others; Ashe has High). Confirm whether it means helping allies or general usefulness.
 - **Mage cards:** confirm Ziggs's Wave clear (assumed High) and Xerath's difficulty (set between Medium and High).
 - Flexibility bonus (beta, Varus only): check in Phase 2 whether it's worth keeping or extending.
 
