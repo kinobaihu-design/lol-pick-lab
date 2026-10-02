@@ -6,3 +6,6 @@ project-brief.pdf
 
 # Mac system files
 .DS_Store
+
+# Python
+__pycache__/

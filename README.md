@@ -8,7 +8,7 @@ A free website that ranks League of Legends ADC and support champions every patc
 2. Build recommendations: items, runes and skill order
 3. A draft helper that recommends a pick
 
-**Status:** setup only. The data collector hasn't been built yet.
+**Status:** the data collector runs on GitHub Actions every 6 hours. The data is on the `data` branch. The website isn't built yet.
 
 Runs on free services: the Riot API (personal key), GitHub Actions for the daily data collection, and Vercel for the website. The Riot API key is stored as a GitHub secret and is never in the code.
 

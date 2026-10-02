@@ -30,6 +30,16 @@ A free public website that ranks ADC and support champions each patch using the 
 - **Website:** hosted on Vercel's free plan, updates automatically when new data lands.
 - Early in a patch, last patch's data can be blended in until the sample is big enough.
 
+## Data collector (Phase 1, built)
+
+- Code: `collector/` (Python standard library only). Settings, including `PRIORITY_SHARE`, double-weight servers, recheck timing and patches kept, are in `collector/config.py`.
+- Schedule: `.github/workflows/collect.yml` runs every 6 hours, about 5 hours of work per run, and never two runs at once. "Run workflow" on the Actions page takes a time limit and a per-region game limit for tests. It saves a checkpoint every hour.
+- What it does: it loads each server's Diamond+ list and checks players for new queue 420 games. Active players are rechecked after 5 hours; inactive ones after 24 hours, then doubling up to 7 days. Each new game is downloaded once, and only Diamond+ participants are counted. Within each routing region, the priority servers get `PRIORITY_SHARE` (70%) of requests: Americas LAN and NA, Europe EUW, Asia KR. SEA is split evenly.
+- Data lives on the `data` branch, replaced each save with no history. `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as scrambled codes.
+- Bans count once per game. Ban rate = games banned ÷ games counted.
+- Skill order isn't collected yet. It's planned for Phase 3, since it needs an extra request per game.
+- Offline checks: `python3 -m unittest discover -s tests`.
+
 ## Scoring model v0.3 (ADC)
 
 `Pick Score = 0.4 × Stats + 0.5 × Comfort + 0.1 × OTP`. Each part is scored 0–100.
@@ -57,7 +67,7 @@ The cutoffs and the floor are first guesses, to be calibrated in Phase 2 against
 ## Project phases
 
 - **Phase 0, setup:** done.
-- **Phase 1, data collector:** regions picked. Still to do: build the daily collector, store the Riot key as a secret, run it a few days and check sample sizes, define the OTP rule.
+- **Phase 1, data collector:** collector built and the Riot key stored as a secret. Still to do: run it a few days and check that sample sizes grow, and define the OTP rule.
 - **Phase 2, tier list website:** scoring code, champion cards, the ADC tier list page (Pick Score, Meta Score, ban suggestions, Worth learning), publishing on Vercel, then tuning.
 - **Phase 3, builds:** build rules, and a champion page with core items, boots, runes and skill order.
 - **Phase 4, draft helper:** matchup and synergy data, and the draft screen.

@@ -1,0 +1,65 @@
+name: Collect match data
+
+on:
+  schedule:
+    - cron: "7 */6 * * *"  # every 6 hours (GitHub may start it a few minutes late)
+  workflow_dispatch:
+    inputs:
+      max_minutes:
+        description: "Stop after this many minutes (300 = 5 hours)"
+        default: "300"
+      max_matches_per_region:
+        description: "Test limit: stop each region after this many game downloads (0 = no limit)"
+        default: "0"
+
+permissions:
+  contents: write
+
+# Never run two collectors at the same time.
+concurrency:
+  group: collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run offline checks
+        run: python -m unittest discover -s tests -v
+
+      - name: Load saved data
+        id: load
+        run: |
+          mkdir -p "$RUNNER_TEMP/data" "$RUNNER_TEMP/data-backup"
+          if git fetch --no-tags --depth=1 origin data:refs/remotes/origin/data; then
+            git archive refs/remotes/origin/data | tar -x -C "$RUNNER_TEMP/data"
+            echo "previous=$(git rev-parse refs/remotes/origin/data)" >> "$GITHUB_OUTPUT"
+          else
+            echo "No saved data yet, starting fresh."
+          fi
+          if git fetch --no-tags --depth=1 origin data-backup:refs/remotes/origin/data-backup; then
+            git archive refs/remotes/origin/data-backup | tar -x -C "$RUNNER_TEMP/data-backup"
+          fi
+
+      - name: Collect games
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+          PREVIOUS: ${{ steps.load.outputs.previous }}
+          MAX_MINUTES: ${{ inputs.max_minutes || '300' }}
+          MAX_MATCHES: ${{ inputs.max_matches_per_region || '0' }}
+          PYTHONUNBUFFERED: "1"
+        run: >
+          python -m collector
+          --data-dir "$RUNNER_TEMP/data"
+          --backup-dir "$RUNNER_TEMP/data-backup"
+          --previous "$PREVIOUS"
+          --max-minutes "$MAX_MINUTES"
+          --max-matches-per-region "$MAX_MATCHES"
+          --push
