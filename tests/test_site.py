@@ -15,12 +15,19 @@ COLUMNS = ["rank", "champion", "tier", "Pick Score", "Comfort", "Stats", "OTP", 
 
 
 sys.path.insert(0, ROOT)
-from scoring import config   # noqa: E402
+from scoring import comfort, config, model   # noqa: E402
 
 
 def read(name):
     with open(os.path.join(SITE, name), encoding="utf-8") as f:
         return f.read()
+
+
+def table_html(table_id):
+    """The HTML of one <table id="..."> on the page."""
+    match = re.search(r'<table id="%s">(.*?)</table>' % table_id, read("index.html"), re.S)
+    assert match, table_id
+    return match.group(1)
 
 
 class SiteFilesTests(unittest.TestCase):
@@ -30,7 +37,7 @@ class SiteFilesTests(unittest.TestCase):
 
     def test_page_has_the_columns_and_header_facts(self):
         html = read("index.html")
-        headers = re.findall(r"<th[^>]*>(.*?)</th>", html)
+        headers = re.findall(r"<th[^>]*>(.*?)</th>", table_html("tier-table"))
         self.assertEqual([h.lower() for h in headers],
                          [c.lower() if c != "rank" else "#" for c in COLUMNS])
         for element_id in ("patch", "updated"):
@@ -54,11 +61,22 @@ class SiteFilesTests(unittest.TestCase):
         self.assertEqual(len(set(colors.values())), 5)
 
     def test_every_column_can_be_sorted(self):
-        html = read("index.html")
-        keys = re.findall(r'<th[^>]*data-sort="([^"]+)"', html)
+        keys = re.findall(r'<th[^>]*data-sort="([^"]+)"', table_html("tier-table"))
         self.assertEqual(len(keys), len(COLUMNS))
         for key in keys:
             self.assertIn("%s:" % key, read("format.js"))
+
+    def test_every_column_of_every_tab_can_be_sorted(self):
+        """Every sortable title in every table has a matching entry in format.js, in that table's own column set."""
+        source = read("format.js")
+        sets = {"tier-table": "SORT_COLUMNS", "meta-table": "META_COLUMNS", "needs-table": "META_COLUMNS",
+                "comfort-table": "COMFORT_COLUMNS", "growth-table": "GROWTH_COLUMNS"}
+        for table, name in sets.items():
+            block = re.search(r"var %s = \{(.*?)\n  \};" % name, source, re.S).group(1)
+            keys = re.findall(r'data-sort="([^"]+)"', table_html(table))
+            self.assertGreater(len(keys), 4, table)
+            for key in keys:
+                self.assertRegex(block, r"(^|\n)\s+%s:" % key, "%s: %s" % (table, key))
 
     def test_the_page_does_not_remember_the_sort(self):
         code = read("app.js") + read("format.js")
@@ -66,12 +84,66 @@ class SiteFilesTests(unittest.TestCase):
             self.assertNotIn(word, code)
 
     def test_page_opens_sorted_by_pick_score_and_has_the_not_ranked_line(self):
-        self.assertIn('key: "pick_score", dir: "desc"', read("app.js"))
+        self.assertIn('sortableTable("tier-table", F.SORT_COLUMNS, "pick_score"', read("app.js"))
         self.assertIn("Carded but not ranked", read("index.html"))
 
     def test_sample_size_limits_are_in_settings(self):
         text = read("settings.js")
         self.assertRegex(text, r"SAMPLE_SIZE_LIMITS:\s*\{\s*low:\s*1000,\s*medium:\s*3000,\s*high:\s*10000\s*\}")
+
+
+class TabTests(unittest.TestCase):
+    """Slice 3: four tabs, the page opens on the Tier list, tabs are plain buttons (no addresses, nothing remembered)."""
+
+    def test_four_tabs_in_order_and_tier_list_is_open_first(self):
+        html = read("index.html")
+        buttons = re.findall(r'<button[^>]*role="tab"[^>]*data-tab="(\w+)"[^>]*aria-selected="(\w+)"[^>]*>([^<]+)</button>', html)
+        self.assertEqual([(b[0], b[2]) for b in buttons],
+                         [("tier", "Tier list"), ("meta", "Meta"), ("comfort", "Comfort"), ("growth", "Growth")])
+        self.assertEqual([b[1] for b in buttons], ["true", "false", "false", "false"])
+        panels = re.findall(r'<section id="tab-(\w+)" class="tabpanel"[^>]*?( hidden)?>', html)
+        self.assertEqual([p[0] for p in panels], ["tier", "meta", "comfort", "growth"])
+        self.assertEqual([bool(p[1]) for p in panels], [False, True, True, True])
+
+    def test_tier_list_tab_keeps_its_columns_and_not_ranked_line(self):
+        self.assertIn("Carded but not ranked", read("index.html"))
+        self.assertIn('"pick_score"', read("app.js"))
+
+    def test_meta_tab_has_the_needs_a_card_list_and_the_columns_asked_for(self):
+        html = read("index.html")
+        self.assertIn("Needs a card", html)
+        heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("meta-table"))]
+        self.assertEqual(heads, ["#", "champion", "meta score", "win rate pts", "pick rate pts", "win rate",
+                                 "vs average", "pick rate", "games"])
+        self.assertIn("no card yet", read("app.js"))
+
+    def test_comfort_tab_has_every_column_asked_for(self):
+        heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("comfort-table"))]
+        self.assertEqual(heads, ["#", "champion", "main type", "secondary type", "type pts", "mastery", "base",
+                                 "trait score", "kit adj.", "difficulty", "diff. adj.", "range adj.", "flexibility", "comfort"])
+        for word in ("<input", "<textarea", "<select", "contenteditable"):
+            self.assertNotIn(word, read("index.html"))            # view only, no editing
+
+    def test_growth_tab_has_the_skill_column_and_no_ban_list(self):
+        heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("growth-table"))]
+        self.assertIn("skill pays off?", heads)
+        self.assertIn("gain", heads)
+        self.assertNotRegex(read("index.html") + read("app.js"), r"(?i)ban threat|ban suggestion|ban list")
+
+    def test_tabs_are_not_remembered_and_the_tooltip_is_instant(self):
+        code = read("app.js")
+        for word in ("localStorage", "sessionStorage", "document.cookie", "location.hash"):
+            self.assertNotIn(word, code)
+        self.assertIn('id="tip"', read("index.html"))
+        self.assertIn('"mouseover"', code)          # custom tooltip, shown at once
+        self.assertNotRegex(code, r"\.title\s*=")        # no slow built-in browser tooltips
+
+    def test_otp_minimum_is_one_setting(self):
+        self.assertRegex(read("settings.js"), r"OTP_MIN_GAMES_SHOWN:\s*20\b")
+        for name in ("app.js", "format.js"):
+            self.assertNotRegex(read(name), r">=\s*20\b")      # the page code never writes the 20 itself
+            self.assertNotIn("OTP_MIN_GAMES_SHOWN", read(name) if name == "format.js" else "")
+        self.assertIn("S.OTP_MIN_GAMES_SHOWN", read("app.js"))
 
 
 def help_texts():
@@ -90,6 +162,7 @@ class HoverHelpTests(unittest.TestCase):
 
     def test_every_column_title_has_a_short_text(self):
         keys = re.findall(r'<th[^>]*data-sort="([^"]+)"', read("index.html"))
+        self.assertGreater(len(set(keys)), 30)                      # all four tabs
         for key in keys:
             self.assertIn(key, self.help, key)
             self.assertGreater(len(self.help[key]), 20, key)
@@ -130,6 +203,59 @@ class HoverHelpTests(unittest.TestCase):
         self.assertIn("Medium {:,}\u2013{:,}".format(medium, high - 1), t)
         self.assertIn("High {:,}+".format(high), t)
         self.assertIn("needs {:,} to be ranked".format(config.MIN_REAL_GAMES), t)
+
+
+    def test_every_tab_and_heading_has_a_text(self):
+        for key in re.findall(r'data-tip-key="([^"]+)"', read("index.html")):
+            self.assertIn(key, self.help, key)
+            self.assertGreater(len(self.help[key]), 20, key)
+
+    def test_the_help_file_says_v0_37(self):
+        self.assertIn("currently v0.37", read("help.js"))
+        self.assertEqual(config.MODEL_VERSION, "v0.37")
+
+    def test_new_texts_match_the_v0_37_numbers(self):
+        h = self.help
+        pct = lambda w: "%g%%" % round(100 * w, 1)
+        # Meta tab
+        self.assertIn("%s win rate points + %s pick rate" % (pct(config.STATS_WIN_RATE_SHARE), pct(config.STATS_PICK_RATE_SHARE)), h["meta_score"])
+        self.assertIn("%g more for every point" % config.WIN_RATE_POINTS_PER_PERCENT, h["wr_points"])
+        self.assertIn("Worth %s of Meta Score" % pct(config.STATS_WIN_RATE_SHARE), h["wr_points"])
+        self.assertIn("Worth %s of Meta Score" % pct(config.STATS_PICK_RATE_SHARE), h["pr_points"])
+        self.assertIn("Needs %s to be ranked" % pct(config.MIN_PICK_RATE), h["pick_rate"])
+        self.assertIn("Worth %s of the Pick Score" % pct(config.WEIGHT_COMFORT), h["c_comfort"])
+        self.assertIn(pct(config.WEIGHT_STATS), h["tab_tier"])
+        self.assertIn(pct(config.WEIGHT_COMFORT), h["tab_tier"])
+        self.assertIn(pct(config.WEIGHT_OTP), h["tab_tier"])
+        # Comfort tab
+        self.assertIn("Worth %s of the base" % pct(config.COMFORT_TYPE_SHARE), h["type_points"])
+        self.assertIn("Worth %s of the base" % pct(config.COMFORT_MASTERY_SHARE), h["c_mastery"])
+        self.assertIn("%s type points + %s mastery points" % (pct(config.COMFORT_TYPE_SHARE), pct(config.COMFORT_MASTERY_SHARE)), h["base"])
+        self.assertIn("High 100%, Mid 97.5%, Low 95%", h["main_type"])
+        self.assertEqual([config.STRENGTH[k] for k in ("high", "mid", "low")], [1.0, 0.975, 0.95])
+        self.assertIn("20% of the gap", h["secondary_type"])
+        self.assertEqual(config.SECONDARY_SHARE, 0.20)
+        self.assertEqual(config.TYPE_POINTS, {"mobility": 100, "peel": 90, "hypercarry": 80, "utility": 80, "mage": 70, "lane_bully": 70})
+        self.assertIn("Mobility 100, Peel 90, Hypercarry and Utility 80, Mage and Lane bully 70", h["type_points"])
+        self.assertIn("Main 100, Good 90, Average 80, Below average 70, Never played 60", h["c_mastery"])
+        self.assertEqual([config.MASTERY_POINTS[k] for k in ("main", "good", "average", "below_average", "never_played")], [100, 90, 80, 70, 60])
+        self.assertIn("0.9 × (trait score", h["kit_adj"])
+        self.assertIn("at most ±%g" % config.KIT_CAP, h["kit_adj"])
+        self.assertIn("−%g × (difficulty − %g)" % (config.DIFFICULTY_WEIGHT, config.DIFFICULTY_MIDDLE), h["diff_adj"])
+        self.assertIn("at most ±%g" % config.DIFFICULTY_CAP, h["diff_adj"])
+        self.assertIn("80% yours + 20% Riot's", h["difficulty"])
+        self.assertEqual((config.DIFFICULTY_MINE_SHARE, config.DIFFICULTY_RIOT_SHARE), (0.8, 0.2))
+        self.assertIn("Short range −%g, Medium 0, Long +%g" % (-config.RANGE_ADJUSTMENT["short"], config.RANGE_ADJUSTMENT["long"]), h["range_adj"])
+        self.assertIn("+%g × the mastery" % config.FLEXIBILITY_BONUS, h["flex"])
+        self.assertIn("Main 20%% up to Never played %d%%" % (100 * config.MASTERY_DIFFICULTY_FACTOR["never_played"]), h["diff_adj"])
+        self.assertEqual(config.MASTERY_DIFFICULTY_FACTOR["main"], 0.20)
+        # Growth tab
+        minimum = int(re.search(r"OTP_MIN_GAMES_SHOWN:\s*(\d+)", read("settings.js")).group(1))
+        self.assertIn("%d or more bot-lane OTP games" % minimum, h["g_skill"])
+        self.assertIn("#3", h["g_score"])
+        self.assertEqual(config.GROWTH_BEAT_RANK, 3)
+        self.assertIn("Never played and Below average are scored as Good", h["g_mastery"])
+        self.assertEqual(config.GROWTH_TARGET, {"never_played": "good", "below_average": "good", "average": "good", "good": "main"})
 
 
 class SiteSafetyTests(unittest.TestCase):
@@ -177,12 +303,72 @@ class SiteDataTests(unittest.TestCase):
         for entry in self.data["cards_not_ranked"]:
             self.assertTrue(entry["failed"], entry["name"])
 
+    def cards_by_name(self):
+        return {model.normalise(c["riot_name"]): c for c in comfort.load_cards()}
+
+    def test_comfort_tab_numbers_are_the_ones_the_pick_score_uses(self):
+        """Every number on the Comfort tab is read from the file; recompute each with the Comfort code and compare."""
+        cards = self.cards_by_name()
+        average = self.data["trait_average"]
+        w = config
+        for row in self.data["pick_score_list"]:
+            card = cards[model.normalise(row["riot_name"])]
+            again = comfort.comfort(card, average)
+            for key, value in again.items():
+                if isinstance(value, float) or isinstance(value, int):
+                    self.assertAlmostEqual(row["comfort_parts"][key], value, delta=0.01, msg="%s %s" % (row["name"], key))
+            self.assertAlmostEqual(row["comfort"], again["comfort"], delta=0.01, msg=row["name"])
+            # the Pick Score is built from exactly this Comfort number
+            expected = w.WEIGHT_STATS * row["stats"] + w.WEIGHT_COMFORT * row["comfort"] + w.WEIGHT_OTP * row["otp_points"]
+            self.assertAlmostEqual(row["pick_score"], expected, delta=0.02, msg=row["name"])
+            # the type, difficulty and range columns come from the card
+            info = row["card_info"]
+            self.assertEqual(info["main_strength"], card["main_strength"])
+            self.assertEqual(info["secondary_types"], card.get("secondary_types", []))
+            self.assertEqual((info["difficulty_riot"], info["difficulty_mine"]), (card["difficulty"]["riot"], card["difficulty"]["mine"]))
+            self.assertEqual(info["range"], card["range"])
+            self.assertEqual(row["main_type"], card["main_type"])
+            self.assertEqual(row["comfort_parts"]["mastery_points"], config.MASTERY_POINTS[card["mastery"]])
+
+    def test_growth_tips_follow_the_number_3_rule(self):
+        """A tip exists exactly when the target-mastery Pick Score beats both the champion's own score and the current #3 pick."""
+        cards = self.cards_by_name()
+        rows = self.data["pick_score_list"]
+        third = sorted((r["pick_score"] for r in rows), reverse=True)[config.GROWTH_BEAT_RANK - 1]
+        tips = {t["id"]: t for t in self.data["growth_advisor"]}
+        for row in rows:
+            if row["mastery"] == "main":
+                self.assertNotIn(row["id"], tips, row["name"])
+                continue
+            target = config.GROWTH_TARGET[row["mastery"]]
+            new_comfort = comfort.comfort(cards[model.normalise(row["riot_name"])], self.data["trait_average"], target)["comfort"]
+            after = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * new_comfort + config.WEIGHT_OTP * row["otp_points"]
+            should = after > third + 0.02 and after > row["pick_score"]
+            if abs(after - third) < 0.02:
+                continue                                    # too close to call after rounding
+            self.assertEqual(row["id"] in tips, should, "%s: %.2f vs #3 %.2f" % (row["name"], after, third))
+            if should:
+                self.assertAlmostEqual(tips[row["id"]]["pick_score_at_target"], after, delta=0.02)
+                self.assertAlmostEqual(tips[row["id"]]["gain"], after - row["pick_score"], delta=0.03)
+        for tip in tips.values():
+            self.assertGreater(tip["pick_score_at_target"], third)
+            self.assertIn(tip["kind"], ("Upgrade", "New champion"))
+            self.assertEqual(tip["kind"] == "New champion", tip["current_mastery"] == "never_played")
+
+    def test_growth_tips_do_not_change_any_score(self):
+        """The skill-pays-off line reads the OTP numbers; the Pick Score still uses only the OTP points."""
+        for row in self.data["pick_score_list"]:
+            expected = (config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * row["comfort"]
+                        + config.WEIGHT_OTP * row["otp_points"])
+            self.assertAlmostEqual(row["pick_score"], expected, delta=0.02)
+
     def test_the_scoring_code_still_writes_those_fields(self):
         """If the scoring code stops writing a field, the page would show gaps; catch it here."""
         with open(os.path.join(ROOT, "scoring", "model.py"), encoding="utf-8") as f:
             source = f.read()
         for key in ("win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games", "cards_not_ranked",
-                    "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort"):
+                    "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort", "card_info", "comfort_parts",
+                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor"):
             self.assertIn('"%s"' % key, source)
 
 

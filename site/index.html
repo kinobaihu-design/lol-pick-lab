@@ -20,34 +20,137 @@
   <div id="notices"><p id="notice" class="notice"></p></div>
   <p id="loading" class="notice">Loading the scores&hellip;</p>
   <div id="content" hidden>
-    <div class="tablewrap">
-      <table>
-        <thead>
-          <tr>
-            <th class="num" data-sort="rank">#</th>
-            <th data-sort="champion">Champion</th>
-            <th data-sort="tier">Tier</th>
-            <th class="num" data-sort="pick_score">Pick Score</th>
-            <th class="num" data-sort="comfort">Comfort</th>
-            <th class="num" data-sort="stats">Stats</th>
-            <th class="num" data-sort="otp">OTP</th>
-            <th class="num" data-sort="win_rate">Win rate</th>
-            <th class="num" data-sort="vs_average">vs average</th>
-            <th class="num" data-sort="games">Games</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
+    <div class="tabs" role="tablist" aria-label="Pages">
+      <button type="button" role="tab" id="tabbtn-tier" data-tab="tier" data-tip-key="tab_tier" aria-selected="true" aria-controls="tab-tier">Tier list</button>
+      <button type="button" role="tab" id="tabbtn-meta" data-tab="meta" data-tip-key="tab_meta" aria-selected="false" aria-controls="tab-meta">Meta</button>
+      <button type="button" role="tab" id="tabbtn-comfort" data-tab="comfort" data-tip-key="tab_comfort" aria-selected="false" aria-controls="tab-comfort">Comfort</button>
+      <button type="button" role="tab" id="tabbtn-growth" data-tab="growth" data-tip-key="tab_growth" aria-selected="false" aria-controls="tab-growth">Growth</button>
     </div>
-    <p class="foot">Click a column title to sort, click again to reverse. Click a champion for its traits and details.
-      &#9888; = win rate 1.5 points or more below the Diamond+ average (a warning only; the tier doesn't change).
-      Games = Diamond+ games on this champion in bot lane, this patch and last patch together.
-      Sample size: Low 1,000&ndash;2,999, Medium 3,000&ndash;9,999, High 10,000+.</p>
-    <section id="notranked" hidden>
-      <h2>Carded but not ranked</h2>
-      <ul id="notranked-list"></ul>
+
+    <section id="tab-tier" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-tier">
+      <div class="tablewrap">
+        <table id="tier-table">
+          <thead>
+            <tr>
+              <th class="num" data-sort="rank">#</th>
+              <th data-sort="champion">Champion</th>
+              <th data-sort="tier">Tier</th>
+              <th class="num" data-sort="pick_score">Pick Score</th>
+              <th class="num" data-sort="comfort">Comfort</th>
+              <th class="num" data-sort="stats">Stats</th>
+              <th class="num" data-sort="otp">OTP</th>
+              <th class="num" data-sort="win_rate">Win rate</th>
+              <th class="num" data-sort="vs_average">vs average</th>
+              <th class="num" data-sort="games">Games</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="foot">Click a column title to sort, click again to reverse. Click a champion for its traits and details.
+        Hover a column title for what it means.
+        &#9888; = win rate 1.5 points or more below the Diamond+ average (a warning only; the tier doesn't change).
+        Games = Diamond+ games on this champion in bot lane, this patch and last patch together.
+        Sample size: Low 1,000&ndash;2,999, Medium 3,000&ndash;9,999, High 10,000+.</p>
+      <section id="notranked" hidden>
+        <h2>Carded but not ranked</h2>
+        <ul id="notranked-list"></ul>
+      </section>
+    </section>
+
+    <section id="tab-meta" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-meta" hidden>
+      <p class="intro">Every champion that passes the 4 filters, ranked by Meta Score: the data alone, with no card and no Comfort.</p>
+      <div class="tablewrap">
+        <table id="meta-table">
+          <thead>
+            <tr>
+              <th class="num" data-sort="meta_rank">#</th>
+              <th data-sort="m_champion">Champion</th>
+              <th class="num" data-sort="meta_score">Meta Score</th>
+              <th class="num" data-sort="wr_points">Win rate pts</th>
+              <th class="num" data-sort="pr_points">Pick rate pts</th>
+              <th class="num" data-sort="win_rate">Win rate</th>
+              <th class="num" data-sort="vs_average">vs average</th>
+              <th class="num" data-sort="pick_rate">Pick rate</th>
+              <th class="num" data-sort="games">Games</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h2 class="sectionhead" data-tip-key="needs_card">Needs a card</h2>
+      <p class="intro">Champions that pass the filters but have no card yet, best Meta Score first. They get a Pick Score once a card is made.</p>
+      <div class="tablewrap" id="needs-wrap">
+        <table id="needs-table">
+          <thead>
+            <tr>
+              <th class="num" data-sort="meta_rank">#</th>
+              <th data-sort="m_champion">Champion</th>
+              <th class="num" data-sort="meta_score">Meta Score</th>
+              <th class="num" data-sort="win_rate">Win rate</th>
+              <th class="num" data-sort="pick_rate">Pick rate</th>
+              <th class="num" data-sort="games">Games</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="needs-empty" class="intro" hidden>Every champion that passes the filters has a card right now.</p>
+    </section>
+
+    <section id="tab-comfort" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-comfort" hidden>
+      <p class="intro">How each Comfort number is built, one row per carded champion. View only: cards are edited in the project, not here.
+        Comfort = 40% type points + 60% mastery points + kit + difficulty + range (+ flexibility), capped at 100.</p>
+      <div class="tablewrap">
+        <table id="comfort-table">
+          <thead>
+            <tr>
+              <th class="num" data-sort="c_rank">#</th>
+              <th data-sort="c_champion">Champion</th>
+              <th data-sort="main_type">Main type</th>
+              <th data-sort="secondary_type">Secondary type</th>
+              <th class="num" data-sort="type_points">Type pts</th>
+              <th data-sort="c_mastery">Mastery</th>
+              <th class="num" data-sort="base">Base</th>
+              <th class="num" data-sort="trait_score">Trait score</th>
+              <th class="num" data-sort="kit_adj">Kit adj.</th>
+              <th class="num" data-sort="difficulty">Difficulty</th>
+              <th class="num" data-sort="diff_adj">Diff. adj.</th>
+              <th class="num" data-sort="range_adj">Range adj.</th>
+              <th class="num" data-sort="flex">Flexibility</th>
+              <th class="num" data-sort="c_comfort">Comfort</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="comfort-old" class="notice warn" hidden>This scores file doesn't carry the card details yet (strengths, difficulty ratings). They appear after the next collector run; the other numbers are real.</p>
+    </section>
+
+    <section id="tab-growth" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-growth" hidden>
+      <p class="intro">Champions that would beat your current #3 pick if you got better at them. Only champions with a card count.
+        The advice never changes any score.</p>
+      <div class="tablewrap" id="growth-wrap">
+        <table id="growth-table">
+          <thead>
+            <tr>
+              <th data-sort="g_champion">Champion</th>
+              <th data-sort="g_kind">Advice</th>
+              <th data-sort="g_mastery">Mastery now</th>
+              <th class="num" data-sort="g_score">Pick Score</th>
+              <th class="num" data-sort="g_gain">Gain</th>
+              <th class="num" data-sort="g_rank">Would rank</th>
+              <th data-sort="g_tier">Tier</th>
+              <th data-sort="g_skill">Skill pays off?</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="growth-empty" class="intro" hidden>No growth tips right now: nothing you could learn or improve would beat your current #3 pick.</p>
     </section>
   </div>
+<div id="tip" role="tooltip" hidden></div>
 </main>
 <script src="settings.js"></script>
 <script src="format.js"></script>

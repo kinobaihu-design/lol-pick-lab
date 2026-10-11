@@ -256,5 +256,85 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(result["ban_threat_list"], sorted(result["ban_threat_list"], key=lambda r: -r["ban_threat"]))
 
 
+class NeedsACardTests(unittest.TestCase):
+    """Meta Score ranks every champion that passes the filters, carded or not; Needs a card is the uncarded ones by Meta Score."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        # Jinx has a card; Zzalpha, Zzbeta and Zzgamma are invented, so they never get one.
+        # [games x2, wins x2, games x1, wins x1]
+        this = {
+            "222": champ("Jinx", [1000, 520, 1000, 520]),
+            "901": champ("Zzalpha", [1000, 560, 1000, 560]),   # best win rate
+            "902": champ("Zzbeta", [1000, 500, 1000, 500]),    # worst win rate
+            "903": champ("Zzgamma", [1000, 530, 1000, 530]),
+        }
+        make_patch(self.root, "16.20", this, 50.0, [4000, 2000, 4000, 2000], [40000, 20000, 40000, 20000])
+        write(os.path.join(self.root, "patches", "16.20", "players.json.gz"), {})
+        self.result = model.score_all(self.root)
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def test_meta_list_includes_uncarded_champions_ranked_by_meta_score(self):
+        meta = self.result["meta_score_list"]
+        self.assertEqual(len(meta), 4)
+        scores = [c["meta_score"] for c in meta]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+        self.assertEqual([c["meta_rank"] for c in meta], [1, 2, 3, 4])
+        self.assertEqual(meta[0]["name"], "Zzalpha")               # uncarded champions can be on top
+        for c in meta:
+            self.assertEqual(c["meta_score"], c["stats"])           # Meta Score = Stats points alone
+            self.assertEqual("pick_score" in c, c["has_card"])
+            if not c["has_card"]:
+                self.assertEqual(c["label"], "no card yet")
+
+    def test_needs_a_card_is_the_uncarded_ones_in_meta_score_order(self):
+        needs = self.result["needs_a_card"]
+        self.assertEqual([c["name"] for c in needs], ["Zzalpha", "Zzgamma", "Zzbeta"])
+        self.assertTrue(all(not c["has_card"] for c in needs))
+        self.assertEqual([c["name"] for c in self.result["pick_score_list"]], ["Jinx"])   # no Pick Score without a card
+
+    def test_comfort_card_details_are_written_for_the_comfort_tab(self):
+        jinx = self.result["pick_score_list"][0]
+        card = next(c for c in comfort.load_cards() if c["name"] == "Jinx")
+        self.assertEqual(jinx["card_info"]["difficulty_mine"], card["difficulty"]["mine"])
+        self.assertEqual(jinx["card_info"]["main_strength"], card["main_strength"])
+        self.assertEqual(jinx["comfort_parts"]["comfort"], jinx["comfort"])
+
+
+class GrowthAdvisorRuleTests(unittest.TestCase):
+    """The advisor compares with the current #3 pick; fewer than 3 carded champions means no tips."""
+
+    def test_no_tips_with_fewer_than_three_carded_champions(self):
+        self.assertEqual(model.growth_advisor({}, {}, [{"pick_score": 80}, {"pick_score": 70}], 13.9, {}), [])
+
+    def test_a_tip_must_beat_the_third_best_pick(self):
+        cards = {c["riot_name"]: c for c in comfort.load_cards()}
+        average = comfort.average_trait_score(list(cards.values()))
+        names = ["Sivir", "Jinx", "Caitlyn", "Kalista"]
+        eligible, carded = {}, {}
+        for i, name in enumerate(names):
+            card = cards[name]
+            parts = comfort.comfort(card, average)
+            eligible[i] = {"id": i, "name": name, "has_card": True, "mastery": card["mastery"], "stats": 50.0,
+                           "otp_points": 50.0, "comfort": parts["comfort"],
+                           "pick_score": config.WEIGHT_STATS * 50 + config.WEIGHT_COMFORT * parts["comfort"] + config.WEIGHT_OTP * 50}
+            carded[i] = card
+        pick_list = sorted(eligible.values(), key=lambda v: -v["pick_score"])
+        stats = {"average_pick_score": 70.0, "spread": 5.0}
+        bar = pick_list[2]["pick_score"]
+        tips = model.growth_advisor(eligible, carded, pick_list, average, stats)
+        for tip in tips:
+            self.assertGreater(tip["pick_score_at_target"], bar)
+            self.assertGreater(tip["pick_score_at_target"], tip["pick_score_now"])
+        # raise Kalista's stats so that even her current score is a top pick: she no longer needs a tip
+        eligible[3]["stats"] = 99.0
+        eligible[3]["pick_score"] += config.WEIGHT_STATS * 49
+        pick_list = sorted(eligible.values(), key=lambda v: -v["pick_score"])
+        again = model.growth_advisor(eligible, carded, pick_list, average, stats)
+        self.assertTrue(all(t["pick_score_at_target"] > pick_list[2]["pick_score"] for t in again))
+
+
 if __name__ == "__main__":
     unittest.main()

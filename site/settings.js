@@ -13,7 +13,10 @@
     STALE_AFTER_HOURS: 13,
     // A win rate this many points (or more) below the Diamond+ average gets a warning sign.
     // Display only: it never changes a tier. Used only if the scores file doesn't say.
-    WIN_RATE_WARNING_DELTA: -1.5
+    WIN_RATE_WARNING_DELTA: -1.5,
+    // An OTP win rate (and the Growth "skill pays off" line) only shows with at least this many
+    // bot-lane OTP games; below it the page says "too few games". It never changes the OTP score.
+    OTP_MIN_GAMES_SHOWN: 20
   };
   if (typeof module !== "undefined" && module.exports) module.exports = SETTINGS;
   else root.SETTINGS = SETTINGS;

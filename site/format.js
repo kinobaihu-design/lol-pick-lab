@@ -136,20 +136,186 @@
     games:   { first: "desc", value: function (c) { return c.real_games; } }
   };
 
-  function firstDirection(key) {
-    return SORT_COLUMNS[key] ? SORT_COLUMNS[key].first : "desc";
+  // ---- slice 3: tabs ----
+
+  var TYPE_NAMES = { mobility: "Mobility", peel: "Peel", hypercarry: "Hypercarry", utility: "Utility",
+                     mage: "Mage", lane_bully: "Lane bully" };
+  var STRENGTH_NAMES = { high: "High", mid: "Mid", low: "Low" };
+  var RANGE_NAMES = { short: "Short", medium: "Medium", long: "Long" };
+
+  function typeText(key) {
+    return TYPE_NAMES[key] || "";
   }
 
-  // Sorted copy of the list. `direction` is "asc" or "desc". Ties keep Pick Score order, then the file's order.
-  function sortRows(list, key, direction) {
-    var col = SORT_COLUMNS[key] || SORT_COLUMNS.pick_score;
+  // "Peel (High)"; empty when the file has no card details.
+  function mainTypeText(champ) {
+    var info = champ.card_info;
+    if (!info || !champ.main_type) return champ.main_type ? typeText(champ.main_type) : "";
+    return typeText(champ.main_type) + " (" + (STRENGTH_NAMES[info.main_strength] || info.main_strength) + ")";
+  }
+
+  // "Utility (Mid)", or "Mobility (Mid), Peel (Low)" with two; "none" when there is no secondary type.
+  function secondaryTypeText(champ) {
+    var info = champ.card_info;
+    if (!info) return "";
+    var list = info.secondary_types || [];
+    if (!list.length) return "none";
+    return list.map(function (s) { return typeText(s.type) + " (" + (STRENGTH_NAMES[s.strength] || s.strength) + ")"; }).join(", ");
+  }
+
+  // 2 -> "2", 2.5 -> "2.5"
+  function plain(value) {
+    return String(Number(Number(value).toFixed(2)));
+  }
+
+  // "3 / 2 \u2192 2.2": Riot's rating, the owner's rating, and the final difficulty used in Comfort.
+  function difficultyText(champ) {
+    var info = champ.card_info, parts = champ.comfort_parts;
+    if (!parts) return "";
+    var final = Number(parts.difficulty).toFixed(1);
+    if (!info) return "\u2192 " + final;
+    return plain(info.difficulty_riot) + " / " + plain(info.difficulty_mine) + " \u2192 " + final;
+  }
+
+  function masteryPointsText(champ) {
+    var parts = champ.comfort_parts;
+    return masteryText(champ.mastery) + (parts ? " (" + parts.mastery_points + ")" : "");
+  }
+
+  // Bonus shown as +1.00; "\u2013" when the card has none.
+  function flexText(champ) {
+    var f = champ.comfort_parts && champ.comfort_parts.flexibility_bonus;
+    return f ? signed(f, 2) : "\u2013";
+  }
+
+  // Champions that pass the filters but have no card yet, best Meta Score first.
+  function needsCard(list) {
+    return list.filter(function (c) { return c.has_card === false; })
+      .map(function (c, i) { return { champ: c, i: i }; })
+      .sort(function (a, b) { return (b.champ.meta_score - a.champ.meta_score) || (a.i - b.i); })
+      .map(function (x) { return x.champ; });
+  }
+
+  // OTP win rate, or "too few games" below the minimum number of bot-lane OTP games.
+  function otpWinRateText(champ, minGames) {
+    if (champ.otp_win_rate === null || champ.otp_win_rate === undefined || !(Number(champ.otp_games) >= minGames)) {
+      return "too few games";
+    }
+    return number(champ.otp_win_rate, 1) + "%";
+  }
+
+  // The OTP win rate minus the overall win rate, only with enough bot-lane OTP games; otherwise null.
+  function skillDelta(champ, minGames) {
+    if (!champ || champ.otp_delta === null || champ.otp_delta === undefined) return null;
+    return Number(champ.otp_games) >= minGames ? Number(champ.otp_delta) : null;
+  }
+
+  // "OTPs win +6.0% more than average players (340 OTP games) \u2192 mastering it pays off".
+  // Empty with fewer than minGames OTP games. Information only: it never changes a score.
+  function skillPaysOffText(champ, minGames) {
+    var d = skillDelta(champ, minGames);
+    if (d === null) return "";
+    var games = Math.round(champ.otp_games).toLocaleString("en-US") + " OTP games";
+    if (d > 0.05) return "OTPs win " + signed(d, 1) + "% more than average players (" + games + ") \u2192 mastering it pays off";
+    if (d < -0.05) return "OTPs win " + number(-d, 1) + "% less than average players (" + games + ") \u2192 mastering it doesn't show up in win rate";
+    return "OTPs win about the same as average players (" + games + ") \u2192 no extra payoff from mastery";
+  }
+
+  // Growth tip: one plain sentence. `list` is the Pick Score list (to find the champion's OTP numbers).
+  function growthTipText(tip) {
+    var now = masteryText(tip.current_mastery), target = masteryText(tip.target_mastery);
+    var from = number(tip.pick_score_now, 1), to = number(tip.pick_score_at_target, 1);
+    if (tip.kind === "New champion") {
+      return "You've never played " + tip.name + ", but at " + target + " it would rank #" + tip.would_rank +
+        " this patch (" + from + " \u2192 " + to + ", " + tip.tier_at_target + " tier); worth starting.";
+    }
+    return "You're " + now + " with " + tip.name + "; at " + target + " it would go from " + from + " to " + to +
+      " (" + tip.tier_at_target + " tier, #" + tip.would_rank + ").";
+  }
+
+  // "Kalista: 71.0 \u2192 79.0 if Good"
+  function growthHeadline(tip) {
+    return tip.name + ": " + number(tip.pick_score_now, 1) + " \u2192 " + number(tip.pick_score_at_target, 1) +
+      " if " + masteryText(tip.target_mastery);
+  }
+
+  // Sorting. Each tab has its own columns: what to sort by, and which way is the first click
+  // ("desc" = best first). `tie` is the value used to break ties (then the file's order).
+  var SORT_COLUMNS = {
+    rank:    { first: "desc", value: function (c) { return c.pick_score; } },
+    champion:{ first: "asc",  value: function (c) { return c.name.toLowerCase(); } },
+    tier:    { first: "desc", value: function (c) { return TIER_ORDER.indexOf(c.tier); }, then: "pick_score" },
+    mastery: { first: "desc", value: function (c) { return MASTERY_ORDER.indexOf(c.mastery); }, then: "pick_score" },
+    pick_score: { first: "desc", value: function (c) { return c.pick_score; } },
+    comfort: { first: "desc", value: function (c) { return c.comfort; } },
+    stats:   { first: "desc", value: function (c) { return c.stats; } },
+    otp:     { first: "desc", value: function (c) { return c.otp_points; } },
+    win_rate:{ first: "desc", value: function (c) { return c.win_rate; } },
+    vs_average: { first: "desc", value: function (c) { return c.win_rate_delta; } },
+    games:   { first: "desc", value: function (c) { return c.real_games; } }
+  };
+
+  var META_COLUMNS = {
+    meta_rank:  { first: "desc", value: function (c) { return c.meta_score; } },
+    m_champion: { first: "asc",  value: function (c) { return c.name.toLowerCase(); } },
+    meta_score: { first: "desc", value: function (c) { return c.meta_score; } },
+    wr_points:  { first: "desc", value: function (c) { return c.win_rate_points; } },
+    pr_points:  { first: "desc", value: function (c) { return c.pick_rate_points; } },
+    win_rate:   SORT_COLUMNS.win_rate,
+    vs_average: SORT_COLUMNS.vs_average,
+    pick_rate:  { first: "desc", value: function (c) { return c.pick_rate; } },
+    games:      SORT_COLUMNS.games
+  };
+
+  var COMFORT_COLUMNS = {
+    c_rank:   { first: "desc", value: function (c) { return c.comfort; } },
+    c_champion: { first: "asc", value: function (c) { return c.name.toLowerCase(); } },
+    main_type: { first: "desc", value: function (c) { return c.comfort_parts.main_points; } },
+    secondary_type: { first: "desc", value: function (c) { return c.comfort_parts.secondary_bonus; } },
+    type_points: { first: "desc", value: function (c) { return c.comfort_parts.type_points; } },
+    c_mastery: { first: "desc", value: function (c) { return c.comfort_parts.mastery_points; } },
+    base:     { first: "desc", value: function (c) { return c.comfort_parts.base; } },
+    trait_score: { first: "desc", value: function (c) { return c.comfort_parts.trait_score; } },
+    kit_adj:  { first: "desc", value: function (c) { return c.comfort_parts.kit_adjustment; } },
+    difficulty: { first: "asc", value: function (c) { return c.comfort_parts.difficulty; } },
+    diff_adj: { first: "desc", value: function (c) { return c.comfort_parts.difficulty_adjustment; } },
+    range_adj: { first: "desc", value: function (c) { return c.comfort_parts.range_adjustment; } },
+    flex:     { first: "desc", value: function (c) { return c.comfort_parts.flexibility_bonus; } },
+    c_comfort: { first: "desc", value: function (c) { return c.comfort; } }
+  };
+
+  var GROWTH_COLUMNS = {
+    g_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
+    g_kind:   { first: "asc", value: function (t) { return t.kind; } },
+    g_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
+    g_score:  { first: "desc", value: function (t) { return t.pick_score_at_target; } },
+    g_gain:   { first: "desc", value: function (t) { return t.gain; } },
+    g_rank:   { first: "asc", value: function (t) { return t.would_rank; } },
+    g_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_at_target); } },
+    g_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
+  };
+
+  function firstDirection(key, columns) {
+    var col = (columns || SORT_COLUMNS)[key];
+    return col ? col.first : "desc";
+  }
+
+  // Sorted copy of the list. `direction` is "asc" or "desc". `columns` is one of the column sets above
+  // (default: the tier table's). Empty values (null) always go last. Ties keep `tie` order (default Pick
+  // Score, highest first), then the file's order.
+  function sortRows(list, key, direction, columns, tie) {
+    columns = columns || SORT_COLUMNS;
+    var col = columns[key] || columns[Object.keys(columns)[0]];
+    var tiebreak = tie || function (c) { return c.pick_score; };
     var sign = direction === "asc" ? 1 : -1;
     return list
       .map(function (c, i) { return { champ: c, i: i }; })
       .sort(function (a, b) {
         var x = col.value(a.champ), y = col.value(b.champ);
-        if (x !== y) return x < y ? -sign : sign;
-        return (b.champ.pick_score - a.champ.pick_score) || (a.i - b.i);
+        var xEmpty = x === null || x === undefined || x !== x, yEmpty = y === null || y === undefined || y !== y;
+        if (xEmpty !== yEmpty) return xEmpty ? 1 : -1;
+        if (!xEmpty && x !== y) return x < y ? -sign : sign;
+        return (tiebreak(b.champ) - tiebreak(a.champ)) || (a.i - b.i);
       })
       .map(function (x) { return x.champ; });
   }
@@ -163,7 +329,12 @@
               describeAge: describeAge, ranked: ranked, tierText: tierText, looksLikeScores: looksLikeScores,
               masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
-              sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS };
+              sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS,
+              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS,
+              typeText: typeText, mainTypeText: mainTypeText, secondaryTypeText: secondaryTypeText,
+              difficultyText: difficultyText, masteryPointsText: masteryPointsText, flexText: flexText,
+              needsCard: needsCard, otpWinRateText: otpWinRateText, skillDelta: skillDelta,
+              skillPaysOffText: skillPaysOffText, growthTipText: growthTipText, growthHeadline: growthHeadline };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Format = api;
 })(typeof window !== "undefined" ? window : this);

@@ -139,3 +139,114 @@ test("sorting: ties keep Pick Score order; first click direction per column", ()
   assert.strictEqual(F.firstDirection("games"), "desc");
   Object.keys(F.SORT_COLUMNS).forEach(k => assert.ok(["asc", "desc"].includes(F.firstDirection(k))));
 });
+
+// ---- slice 3 (v0.37) ----
+
+test("OTP win rate shows 'too few games' below the minimum, and the minimum is one setting (20)", () => {
+  const min = S.OTP_MIN_GAMES_SHOWN;
+  assert.strictEqual(min, 20);
+  assert.strictEqual(F.otpWinRateText({ otp_win_rate: 55.4, otp_games: 19 }, min), "too few games");
+  assert.strictEqual(F.otpWinRateText({ otp_win_rate: 0, otp_games: 2 }, min), "too few games");   // Mel showed 0.0% from 2 games
+  assert.strictEqual(F.otpWinRateText({ otp_win_rate: null, otp_games: 0 }, min), "too few games");
+  assert.strictEqual(F.otpWinRateText({ otp_win_rate: 55.4, otp_games: 20 }, min), "55.4%");
+  assert.strictEqual(F.otpWinRateText({ otp_win_rate: 55.44, otp_games: 1442 }, min), "55.4%");
+});
+
+test("'skill pays off' shows only with 20 or more bot-lane OTP games", () => {
+  const min = S.OTP_MIN_GAMES_SHOWN;
+  assert.strictEqual(F.skillPaysOffText({ otp_games: 19, otp_delta: 6 }, min), "");
+  assert.strictEqual(F.skillPaysOffText({ otp_games: 0, otp_delta: null }, min), "");
+  assert.strictEqual(F.skillPaysOffText({ otp_games: 340, otp_delta: null }, min), "");
+  assert.strictEqual(F.skillPaysOffText(undefined, min), "");
+  assert.strictEqual(F.skillPaysOffText({ otp_games: 340, otp_delta: 6.04 }, min),
+    "OTPs win +6.0% more than average players (340 OTP games) → mastering it pays off");
+  assert.ok(F.skillPaysOffText({ otp_games: 20, otp_delta: 1 }, min).includes("pays off"));
+  assert.ok(F.skillPaysOffText({ otp_games: 100, otp_delta: -2 }, min).includes("less than average players"));
+  assert.ok(!F.skillPaysOffText({ otp_games: 100, otp_delta: -2 }, min).includes("pays off"));
+  assert.strictEqual(F.skillDelta({ otp_games: 19, otp_delta: 6 }, min), null);
+  assert.strictEqual(F.skillDelta({ otp_games: 20, otp_delta: 6 }, min), 6);
+});
+
+const META_LIST = [
+  { name: "Carded", has_card: true, meta_score: 70, win_rate_points: 60, pick_rate_points: 90, win_rate: 52, win_rate_delta: 2, pick_rate: 0.1, real_games: 9000 },
+  { name: "Nocard B", has_card: false, label: "no card yet", meta_score: 80, win_rate_points: 90, pick_rate_points: 30, win_rate: 54, win_rate_delta: 4, pick_rate: 0.01, real_games: 2000 },
+  { name: "Nocard A", has_card: false, label: "no card yet", meta_score: 60, win_rate_points: 50, pick_rate_points: 70, win_rate: 50, win_rate_delta: 0, pick_rate: 0.05, real_games: 4000 },
+  { name: "Nocard C", has_card: false, label: "no card yet", meta_score: 75, win_rate_points: 80, pick_rate_points: 50, win_rate: 53, win_rate_delta: 3, pick_rate: 0.03, real_games: 3000 }
+];
+
+test("Needs a card: only uncarded champions, best Meta Score first, input untouched", () => {
+  assert.deepStrictEqual(F.needsCard(META_LIST).map(c => c.name), ["Nocard B", "Nocard C", "Nocard A"]);
+  assert.deepStrictEqual(F.needsCard(META_LIST.filter(c => c.has_card)), []);
+  assert.strictEqual(META_LIST.length, 4);
+});
+
+test("Meta tab sorts by Meta Score with uncarded champions included, and by every column", () => {
+  const by = (key, dir) => F.sortRows(META_LIST, key, dir, F.META_COLUMNS, c => c.meta_score).map(c => c.name);
+  assert.deepStrictEqual(by("meta_score", "desc"), ["Nocard B", "Nocard C", "Carded", "Nocard A"]);
+  assert.deepStrictEqual(by("meta_rank", "desc"), ["Nocard B", "Nocard C", "Carded", "Nocard A"]);
+  assert.deepStrictEqual(by("meta_score", "asc"), ["Nocard A", "Carded", "Nocard C", "Nocard B"]);
+  assert.deepStrictEqual(by("m_champion", "asc"), ["Carded", "Nocard A", "Nocard B", "Nocard C"]);
+  assert.deepStrictEqual(by("wr_points", "desc"), ["Nocard B", "Nocard C", "Carded", "Nocard A"]);
+  assert.deepStrictEqual(by("pr_points", "desc"), ["Carded", "Nocard A", "Nocard C", "Nocard B"]);
+  assert.deepStrictEqual(by("pick_rate", "desc"), ["Carded", "Nocard A", "Nocard C", "Nocard B"]);
+  assert.deepStrictEqual(by("games", "asc"), ["Nocard B", "Nocard C", "Nocard A", "Carded"]);
+  assert.deepStrictEqual(by("win_rate", "desc"), ["Nocard B", "Nocard C", "Carded", "Nocard A"]);
+  assert.deepStrictEqual(by("vs_average", "asc"), ["Nocard A", "Carded", "Nocard C", "Nocard B"]);
+});
+
+const CARD = {
+  name: "Vayne", mastery: "below_average", main_type: "hypercarry", comfort: 69.9,
+  card_info: { main_strength: "high", secondary_types: [{ type: "mobility", strength: "mid" }, { type: "peel", strength: "low" }],
+               difficulty_riot: 3, difficulty_mine: 2, range: "medium", flexible_build: false },
+  comfort_parts: { type_points: 83.5, main_points: 80, secondary_bonus: 3.5, mastery_points: 70, base: 75.4, trait_score: 7.5,
+                   kit_adjustment: -5, difficulty: 2.2, difficulty_adjustment: -0.48, range_adjustment: 0, flexibility_bonus: 0 }
+};
+
+test("Comfort tab texts come straight from the card details and the Comfort parts", () => {
+  assert.strictEqual(F.mainTypeText(CARD), "Hypercarry (High)");
+  assert.strictEqual(F.secondaryTypeText(CARD), "Mobility (Mid), Peel (Low)");
+  assert.strictEqual(F.secondaryTypeText({ card_info: { secondary_types: [] } }), "none");
+  assert.strictEqual(F.difficultyText(CARD), "3 / 2 → 2.2");
+  assert.strictEqual(F.difficultyText({ comfort_parts: { difficulty: 2.6 }, card_info: { difficulty_riot: 3, difficulty_mine: 2.5 } }), "3 / 2.5 → 2.6");
+  assert.strictEqual(F.masteryPointsText(CARD), "Below average (70)");
+  assert.strictEqual(F.flexText(CARD), "–");
+  assert.strictEqual(F.flexText({ comfort_parts: { flexibility_bonus: 0.25 } }), "+0.25");
+  // an older scores file without card details still draws
+  assert.strictEqual(F.mainTypeText({ main_type: "peel" }), "Peel");
+  assert.strictEqual(F.secondaryTypeText({}), "");
+});
+
+test("Comfort tab sorts by every column", () => {
+  const list = [
+    { name: "B", comfort: 80, comfort_parts: { main_points: 90, secondary_bonus: 0, type_points: 90, mastery_points: 80, base: 80, trait_score: 10, kit_adjustment: 1, difficulty: 2, difficulty_adjustment: 0, range_adjustment: 0.5, flexibility_bonus: 0 } },
+    { name: "A", comfort: 90, comfort_parts: { main_points: 100, secondary_bonus: 1, type_points: 101, mastery_points: 100, base: 95, trait_score: 15, kit_adjustment: 3, difficulty: 1, difficulty_adjustment: 3, range_adjustment: -0.5, flexibility_bonus: 0.5 } }
+  ];
+  Object.keys(F.COMFORT_COLUMNS).forEach(key => {
+    const col = F.COMFORT_COLUMNS[key];
+    const desc = F.sortRows(list, key, "desc", F.COMFORT_COLUMNS).map(c => c.name).join("");
+    const asc = F.sortRows(list, key, "asc", F.COMFORT_COLUMNS).map(c => c.name).join("");
+    assert.strictEqual(desc.split("").reverse().join(""), asc, key);
+    assert.ok(["asc", "desc"].includes(F.firstDirection(key, F.COMFORT_COLUMNS)));
+  });
+  assert.strictEqual(F.sortRows(list, "c_comfort", "desc", F.COMFORT_COLUMNS).map(c => c.name).join(""), "AB");
+  assert.strictEqual(F.sortRows(list, "difficulty", "asc", F.COMFORT_COLUMNS).map(c => c.name).join(""), "AB");   // easiest first
+});
+
+test("Growth tips: wording, headline and sorting (empty skill values go last)", () => {
+  const tip = { name: "Kalista", kind: "New champion", current_mastery: "never_played", target_mastery: "good",
+                pick_score_now: 71, pick_score_at_target: 79, gain: 8, would_rank: 2, tier_at_target: "A" };
+  assert.strictEqual(F.growthHeadline(tip), "Kalista: 71.0 → 79.0 if Good");
+  assert.ok(F.growthTipText(tip).startsWith("You've never played Kalista, but at Good it would rank #2 this patch"));
+  const up = { name: "Jinx", kind: "Upgrade", current_mastery: "good", target_mastery: "main", pick_score_now: 74, pick_score_at_target: 80, gain: 6, would_rank: 1, tier_at_target: "S" };
+  assert.ok(F.growthTipText(up).startsWith("You're Good with Jinx; at Main it would go from 74.0 to 80.0"));
+  const tips = [
+    Object.assign({}, up, { skill_delta: null }),
+    Object.assign({}, tip, { skill_delta: 2 }),
+    Object.assign({}, up, { name: "Zed", skill_delta: 5 })
+  ];
+  const by = (key, dir) => F.sortRows(tips, key, dir, F.GROWTH_COLUMNS, t => t.pick_score_at_target).map(t => t.name);
+  assert.deepStrictEqual(by("g_skill", "desc"), ["Zed", "Kalista", "Jinx"]);
+  assert.deepStrictEqual(by("g_skill", "asc"), ["Kalista", "Zed", "Jinx"]);     // null stays last both ways
+  assert.deepStrictEqual(by("g_champion", "asc"), ["Jinx", "Kalista", "Zed"]);
+  Object.keys(F.GROWTH_COLUMNS).forEach(key => assert.ok(["asc", "desc"].includes(F.firstDirection(key, F.GROWTH_COLUMNS))));
+});

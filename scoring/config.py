@@ -1,10 +1,10 @@
-"""Scoring settings (model v0.36). Change numbers here, not in the rest of the code.
+"""Scoring settings (model v0.37). Change numbers here, not in the rest of the code.
 
 Every number below comes from the project brief. If the brief changes, change it here
 and bump MODEL_VERSION.
 """
 
-MODEL_VERSION = "v0.36"
+MODEL_VERSION = "v0.37"
 
 # ---- Pick Score = 0.425 x Stats + 0.525 x Comfort + 0.05 x OTP ----
 WEIGHT_STATS = 0.425

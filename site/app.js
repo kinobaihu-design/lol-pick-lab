@@ -19,7 +19,9 @@
     });
   }
 
+  // Opening the page as index.html?saved shows the saved copy on purpose (handy for checking new fields).
   function loadScores() {
+    if (/[?&]saved\b/.test(location.search)) return load(S.FALLBACK_URL).then(function (data) { return { data: data, fallback: true }; });
     return load(S.DATA_URL).then(
       function (data) { return { data: data, fallback: false }; },
       function () { return load(S.FALLBACK_URL).then(function (data) { return { data: data, fallback: true }; }); }
@@ -40,7 +42,9 @@
     notice.textContent = "";
     if (fallback) {
       notice.className = "notice warn";
-      notice.textContent = "Showing a saved copy that ships with this page, not the live data. The live scores could not be reached.";
+      notice.textContent = /[?&]saved\b/.test(location.search)
+        ? "Showing the saved copy that ships with this page, because you asked for it (?saved), not the live data."
+        : "Showing a saved copy that ships with this page, not the live data. The live scores could not be reached.";
     }
     if (F.isStale(data.generated, new Date(), S.STALE_AFTER_HOURS)) {
       var stale = el("p", "notice bad", "These scores are more than " + S.STALE_AFTER_HOURS +
@@ -56,13 +60,99 @@
   }
 
   var COLSPAN = 10;
-  var state = { data: null, list: [], rankOf: {}, key: "pick_score", dir: "desc", open: {} };
+  var state = { data: null, byId: {}, open: {} };
+
+  // ---- instant hover help: any element with data-tip shows its text at once (no browser delay) ----
+  var tip = document.getElementById("tip");
+  function showTip(target) {
+    var text = target.getAttribute("data-tip");
+    if (!text) return;
+    tip.textContent = text;
+    tip.hidden = false;
+    var box = target.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    var left = Math.max(8, Math.min(box.left + box.width / 2 - w / 2, window.innerWidth - w - 8));
+    var top = box.bottom + 8;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, box.top - h - 8);
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function hideTip() { tip.hidden = true; }
+  document.addEventListener("mouseover", function (e) {
+    var t = e.target.closest ? e.target.closest("[data-tip]") : null;
+    if (t) showTip(t); else hideTip();
+  });
+  document.addEventListener("focusin", function (e) {
+    var t = e.target.closest ? e.target.closest("[data-tip]") : null;
+    if (t) showTip(t); else hideTip();
+  });
+  document.addEventListener("focusout", hideTip);
+  document.addEventListener("scroll", hideTip, true);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideTip(); });
+
+  // Hover help for the tab buttons and headings that name a text in help.js.
+  function wireTips() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-tip-key]"), function (node) {
+      var text = H[node.getAttribute("data-tip-key")];
+      if (text) node.setAttribute("data-tip", text);
+    });
+  }
+
+  // A table whose column titles sort it. `columns` says how each column sorts (see format.js);
+  // `drawRows(item, body)` adds the rows for one item. Each table remembers nothing between visits.
+  function sortableTable(id, columns, firstKey, tie, drawRows) {
+    var table = document.getElementById(id);
+    var self = { list: [], key: firstKey, dir: F.firstDirection(firstKey, columns) };
+    var heads = Array.prototype.slice.call(table.querySelectorAll("th[data-sort]"));
+
+    self.draw = function () {
+      var body = table.tBodies[0];
+      body.textContent = "";
+      F.sortRows(self.list, self.key, self.dir, columns, tie).forEach(function (item) { drawRows(item, body); });
+      heads.forEach(function (th) {
+        if (th.getAttribute("data-sort") === self.key) th.setAttribute("aria-sort", self.dir === "asc" ? "ascending" : "descending");
+        else th.removeAttribute("aria-sort");
+      });
+    };
+
+    heads.forEach(function (th) {
+      var key = th.getAttribute("data-sort");
+      th.tabIndex = 0;
+      if (H[key]) th.setAttribute("data-tip", H[key]);
+      function go() {
+        if (self.key === key) self.dir = self.dir === "asc" ? "desc" : "asc";
+        else { self.key = key; self.dir = F.firstDirection(key, columns); }
+        self.draw();
+      }
+      th.addEventListener("click", go);
+      th.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    });
+    return self;
+  }
+
+  function tierBadge(tier) {
+    return el("span", "tier tier-" + tier, tier);
+  }
+
+  function winRateCell(tr, c) {
+    var wrCell = cell(tr, F.number(c.win_rate, 2) + "%", "num");
+    if (F.hasWinRateWarning(c, S.WIN_RATE_WARNING_DELTA)) {
+      var w = el("span", "warnsign", " \u26A0");
+      w.setAttribute("data-tip", "Win rate is 1.5 points or more below the Diamond+ average (warning only; the tier doesn't change)");
+      wrCell.appendChild(w);
+    }
+    return wrCell;
+  }
+
+  function deltaCell(tr, c) {
+    var delta = c.win_rate_delta;
+    cell(tr, F.signed(delta, 2), "num " + (delta > 0.005 ? "up" : delta < -0.005 ? "down" : ""));
+  }
 
   // Mastery as 5 small dots (more filled = better), colored by level; the name is in the tooltip.
   function masteryIcon(c) {
     var level = F.masteryLevel(c.mastery);
     var icon = el("span", "mastery mastery-" + c.mastery);
-    icon.title = "Mastery: " + F.masteryText(c.mastery);
+    icon.setAttribute("data-tip", "Mastery: " + F.masteryText(c.mastery));
     icon.setAttribute("role", "img");
     icon.setAttribute("aria-label", "Mastery: " + F.masteryText(c.mastery));
     for (var i = 1; i <= 5; i++) icon.appendChild(el("i", i <= level ? "on" : ""));
@@ -100,10 +190,9 @@
     var otp = el("div");
     otp.appendChild(el("h3", null, "One-tricks (OTP)"));
     otp.appendChild(el("p", null, F.otpText(c)));
-    if (c.otp_win_rate !== null && c.otp_win_rate !== undefined) {
-      otp.appendChild(el("p", null, "OTP win rate " + F.number(c.otp_win_rate, 1) + "% vs " +
-        F.number(c.overall_win_rate_raw, 1) + "% for everyone"));
-    }
+    var shown = F.otpWinRateText(c, S.OTP_MIN_GAMES_SHOWN);
+    otp.appendChild(el("p", null, shown === "too few games" ? "OTP win rate: too few games" :
+      "OTP win rate " + shown + " vs " + F.number(c.overall_win_rate_raw, 1) + "% for everyone"));
     grid.appendChild(otp);
 
     td.appendChild(grid);
@@ -111,77 +200,144 @@
     return tr;
   }
 
-  function drawTable() {
-    var body = document.getElementById("rows");
-    body.textContent = "";
-    var rows = F.sortRows(state.list, state.key, state.dir);
-    rows.forEach(function (c) {
-      var tr = el("tr");
-      cell(tr, state.rankOf[c.name], "num rank");
+  // ---- Tier list tab (unchanged) ----
+  function tierRows(c, body) {
+    var tr = el("tr");
+    cell(tr, state.rankOf[c.name], "num rank");
 
-      var nameCell = el("td", "champ");
-      var btn = el("button", "champbtn", c.name);
-      btn.type = "button";
-      btn.setAttribute("aria-expanded", state.open[c.name] ? "true" : "false");
-      btn.addEventListener("click", function () {
-        state.open[c.name] = !state.open[c.name];
-        drawTable();
+    var nameCell = el("td", "champ");
+    var btn = el("button", "champbtn", c.name);
+    btn.type = "button";
+    btn.setAttribute("aria-expanded", state.open[c.name] ? "true" : "false");
+    btn.addEventListener("click", function () {
+      state.open[c.name] = !state.open[c.name];
+      tables.tier.draw();
+    });
+    nameCell.appendChild(btn);
+    tr.appendChild(nameCell);
+
+    var tierCell = el("td", "tiercell");
+    tierCell.appendChild(el("span", "tier tier-" + c.tier, F.tierText(c)));
+    tr.appendChild(tierCell);
+
+    cell(tr, F.number(c.pick_score, 1), "num score");
+    var comfortCell = cell(tr, F.number(c.comfort, 1), "num");
+    if (c.mastery) comfortCell.appendChild(masteryIcon(c));
+    cell(tr, F.number(c.stats, 1), "num");
+
+    var otpCell = cell(tr, F.number(c.otp_points, 1), "num");
+    otpCell.setAttribute("data-tip", F.otpText(c));
+    otpCell.appendChild(el("span", "sub", (c.otp_players || 0) + " players, " + F.games(c.otp_games || 0) + " bot-lane games"));
+
+    winRateCell(tr, c);
+    deltaCell(tr, c);
+
+    var sample = F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS);
+    var gamesCell = cell(tr, F.games(c.real_games), "num");
+    gamesCell.appendChild(el("span", "sub sample-" + sample.split(" ")[0], sample + " sample"));
+    body.appendChild(tr);
+    if (state.open[c.name]) body.appendChild(detailRow(c));
+  }
+
+  // ---- Meta tab ----
+  function nameWithLabel(tr, c) {
+    var td = el("td", "champ", c.name);
+    if (c.has_card === false) td.appendChild(el("span", "nocard", "no card yet"));
+    tr.appendChild(td);
+  }
+
+  function metaRows(c, body) {
+    var tr = el("tr");
+    cell(tr, state.metaRankOf[c.name], "num rank");
+    nameWithLabel(tr, c);
+    cell(tr, F.number(c.meta_score, 1), "num score");
+    cell(tr, F.number(c.win_rate_points, 1), "num");
+    cell(tr, F.number(c.pick_rate_points, 1), "num");
+    winRateCell(tr, c);
+    deltaCell(tr, c);
+    cell(tr, F.number(100 * c.pick_rate, 1) + "%", "num");
+    var sample = F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS);
+    var gamesCell = cell(tr, F.games(c.real_games), "num");
+    gamesCell.appendChild(el("span", "sub sample-" + sample.split(" ")[0], sample + " sample"));
+    body.appendChild(tr);
+  }
+
+  function needsRows(c, body) {
+    var tr = el("tr");
+    cell(tr, state.metaRankOf[c.name], "num rank");
+    cell(tr, c.name, "champ");
+    cell(tr, F.number(c.meta_score, 1), "num score");
+    winRateCell(tr, c);
+    cell(tr, F.number(100 * c.pick_rate, 1) + "%", "num");
+    cell(tr, F.games(c.real_games), "num");
+    body.appendChild(tr);
+  }
+
+  // ---- Comfort tab ----
+  function comfortRows(c, body) {
+    var p = c.comfort_parts, tr = el("tr");
+    cell(tr, state.comfortRankOf[c.name], "num rank");
+    cell(tr, c.name, "champ");
+    cell(tr, F.mainTypeText(c) || "\u2013");
+    cell(tr, F.secondaryTypeText(c) || "\u2013");
+    cell(tr, F.number(p.type_points, 1), "num");
+    var m = cell(tr, F.masteryPointsText(c));
+    m.className = "mastery-text mastery-" + c.mastery;
+    cell(tr, F.number(p.base, 1), "num");
+    cell(tr, F.number(p.trait_score, 1), "num");
+    cell(tr, F.signed(p.kit_adjustment, 2), "num");
+    cell(tr, F.difficultyText(c), "num");
+    cell(tr, F.signed(p.difficulty_adjustment, 2), "num");
+    cell(tr, F.signed(p.range_adjustment, 2), "num");
+    cell(tr, F.flexText(c), "num");
+    cell(tr, F.number(c.comfort, 1), "num score");
+    body.appendChild(tr);
+  }
+
+  // ---- Growth tab ----
+  function growthRows(t, body) {
+    var tr = el("tr");
+    var name = el("td", "champ", t.name);
+    name.appendChild(el("span", "sub tipline", F.growthTipText(t)));
+    tr.appendChild(name);
+    var kind = el("td");
+    kind.appendChild(el("span", "kind kind-" + (t.kind === "New champion" ? "new" : "up"), t.kind));
+    tr.appendChild(kind);
+    cell(tr, F.masteryText(t.current_mastery) + " \u2192 " + F.masteryText(t.target_mastery));
+    cell(tr, F.number(t.pick_score_now, 1) + " \u2192 " + F.number(t.pick_score_at_target, 1), "num");
+    cell(tr, "+" + F.number(t.gain, 1), "num up");
+    cell(tr, "#" + t.would_rank, "num");
+    var tierCell = el("td");
+    tierCell.appendChild(tierBadge(t.tier_at_target));
+    tr.appendChild(tierCell);
+    var skill = F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+    cell(tr, skill, "skill");
+    body.appendChild(tr);
+  }
+
+  // ---- tabs ----
+  var tables = {};
+  function selectTab(name) {
+    Array.prototype.forEach.call(document.querySelectorAll("[role=tab]"), function (b) {
+      b.setAttribute("aria-selected", b.getAttribute("data-tab") === name ? "true" : "false");
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".tabpanel"), function (p) {
+      p.hidden = p.id !== "tab-" + name;
+    });
+    hideTip();
+  }
+
+  function wireTabs() {
+    var buttons = Array.prototype.slice.call(document.querySelectorAll("[role=tab]"));
+    buttons.forEach(function (b, i) {
+      b.addEventListener("click", function () { selectTab(b.getAttribute("data-tab")); });
+      b.addEventListener("keydown", function (e) {
+        var to = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : -1;
+        if (to < 0) return;
+        var next = buttons[(to + buttons.length) % buttons.length];
+        next.focus();
+        selectTab(next.getAttribute("data-tab"));
       });
-      nameCell.appendChild(btn);
-      tr.appendChild(nameCell);
-
-      var tierCell = el("td", "tiercell");
-      tierCell.appendChild(el("span", "tier tier-" + c.tier, F.tierText(c)));
-      tr.appendChild(tierCell);
-
-      cell(tr, F.number(c.pick_score, 1), "num score");
-      var comfortCell = cell(tr, F.number(c.comfort, 1), "num");
-      if (c.mastery) comfortCell.appendChild(masteryIcon(c));
-      cell(tr, F.number(c.stats, 1), "num");
-
-      var otpCell = cell(tr, F.number(c.otp_points, 1), "num");
-      otpCell.title = F.otpText(c);
-      otpCell.appendChild(el("span", "sub", (c.otp_players || 0) + " players, " + F.games(c.otp_games || 0) + " bot-lane games"));
-
-      var wrCell = cell(tr, F.number(c.win_rate, 2) + "%", "num");
-      if (F.hasWinRateWarning(c, S.WIN_RATE_WARNING_DELTA)) {
-        var w = el("span", "warnsign", " \u26A0");
-        w.title = "Win rate is 1.5 points or more below the Diamond+ average (warning only; the tier doesn't change)";
-        wrCell.appendChild(w);
-      }
-      var delta = c.win_rate_delta;
-      cell(tr, F.signed(delta, 2), "num " + (delta > 0.005 ? "up" : delta < -0.005 ? "down" : ""));
-
-      var sample = F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS);
-      var gamesCell = cell(tr, F.games(c.real_games), "num");
-      gamesCell.appendChild(el("span", "sub sample-" + sample.split(" ")[0], sample + " sample"));
-      body.appendChild(tr);
-      if (state.open[c.name]) body.appendChild(detailRow(c));
-    });
-    markHeaders();
-  }
-
-  function markHeaders() {
-    Array.prototype.forEach.call(document.querySelectorAll("th[data-sort]"), function (th) {
-      var on = th.getAttribute("data-sort") === state.key;
-      if (on) th.setAttribute("aria-sort", state.dir === "asc" ? "ascending" : "descending");
-      else th.removeAttribute("aria-sort");
-    });
-  }
-
-  function wireHeaders() {
-    Array.prototype.forEach.call(document.querySelectorAll("th[data-sort]"), function (th) {
-      th.tabIndex = 0;
-      var tip = H[th.getAttribute("data-sort")];
-      if (tip) th.title = tip;
-      function go() {
-        var key = th.getAttribute("data-sort");
-        if (state.key === key) state.dir = state.dir === "asc" ? "desc" : "asc";
-        else { state.key = key; state.dir = F.firstDirection(key); }
-        drawTable();
-      }
-      th.addEventListener("click", go);
-      th.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
     });
   }
 
@@ -194,14 +350,58 @@
     section.hidden = items.length === 0;
   }
 
-  // The page always opens sorted by Pick Score (so by tier); the sort is not remembered.
+  function rankMap(list, key) {
+    var map = {};
+    list.slice().sort(function (a, b) { return b[key] - a[key]; }).forEach(function (c, i) { map[c.name] = i + 1; });
+    return map;
+  }
+
+  // The page always opens on the Tier list, sorted by Pick Score (so by tier); sorts are not remembered.
   function start(data) {
     state.data = data;
-    state.list = data.pick_score_list;
+    var picks = data.pick_score_list;
+    var metaList = data.meta_score_list || picks;
     state.rankOf = {};
-    F.ranked(data.pick_score_list).forEach(function (c, i) { state.rankOf[c.name] = i + 1; });
-    wireHeaders();
-    drawTable();
+    F.ranked(picks).forEach(function (c, i) { state.rankOf[c.name] = i + 1; });
+    state.metaRankOf = rankMap(metaList, "meta_score");
+    state.comfortRankOf = rankMap(picks, "comfort");
+    picks.forEach(function (c) { state.byId[c.id] = c; });
+
+    wireTips();
+    wireTabs();
+
+    tables.tier = sortableTable("tier-table", F.SORT_COLUMNS, "pick_score", null, tierRows);
+    tables.tier.list = picks;
+    tables.tier.draw();
+
+    tables.meta = sortableTable("meta-table", F.META_COLUMNS, "meta_score", function (c) { return c.meta_score; }, metaRows);
+    tables.meta.list = metaList;
+    tables.meta.draw();
+
+    var needs = F.needsCard(metaList);
+    tables.needs = sortableTable("needs-table", F.META_COLUMNS, "meta_score", function (c) { return c.meta_score; }, needsRows);
+    tables.needs.list = needs;
+    tables.needs.draw();
+    document.getElementById("needs-wrap").hidden = needs.length === 0;
+    document.getElementById("needs-empty").hidden = needs.length !== 0;
+
+    tables.comfort = sortableTable("comfort-table", F.COMFORT_COLUMNS, "c_comfort", function (c) { return c.pick_score; }, comfortRows);
+    tables.comfort.list = picks.filter(function (c) { return c.comfort_parts; });
+    tables.comfort.draw();
+    document.getElementById("comfort-old").hidden = picks.every(function (c) { return c.card_info; });
+
+    var tips = (data.growth_advisor || []).map(function (t) {
+      var copy = {};
+      Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
+      copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+      return copy;
+    });
+    tables.growth = sortableTable("growth-table", F.GROWTH_COLUMNS, "g_score", function (t) { return t.pick_score_at_target; }, growthRows);
+    tables.growth.list = tips;
+    tables.growth.draw();
+    document.getElementById("growth-wrap").hidden = tips.length === 0;
+    document.getElementById("growth-empty").hidden = tips.length !== 0;
+
     drawNotRanked(data);
   }
 

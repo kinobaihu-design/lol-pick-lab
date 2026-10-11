@@ -425,6 +425,15 @@ def score_all(root, cards=None, now=None):
         v["traits"] = card.get("traits", {})
         v["main_type"] = card.get("main_type")
         v["kind"] = card.get("kind")
+        # What the Comfort tab shows next to comfort_parts (view only; nothing here feeds a score).
+        v["card_info"] = {
+            "main_strength": card["main_strength"],
+            "secondary_types": card.get("secondary_types", []),
+            "difficulty_riot": card["difficulty"]["riot"],
+            "difficulty_mine": card["difficulty"]["mine"],
+            "range": card["range"],
+            "flexible_build": bool(card.get("flexible_build")),
+        }
         v["pick_score"] = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * v["comfort"]
                            + config.WEIGHT_OTP * v["otp_points"])
 
@@ -462,7 +471,7 @@ def score_all(root, cards=None, now=None):
         out["data_label"] = "Data: %d%% this patch" % round(100 * v["this_patch_share"])
         if v["has_card"]:
             out.update({k: v[k] for k in ("mastery", "traits", "main_type", "kind", "comfort", "comfort_parts", "pick_score", "pick_rank",
-                                          "spreads", "tier", "win_rate_warning")})
+                                          "spreads", "tier", "win_rate_warning", "card_info")})
         else:
             out["label"] = "no card yet"
         return out
