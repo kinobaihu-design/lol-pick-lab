@@ -387,7 +387,7 @@ def score_all(root, cards=None, now=None):
         v["meta_rank"] = i
 
     advisor = growth_advisor(eligible, carded, pick_list, trait_average, tier_stats)
-    reach = reach_list(eligible, carded, pick_list, trait_average, tier_stats)
+    next_step, next_step_closest = next_step_list(eligible, carded, pick_list, trait_average, tier_stats)
 
     def clean(v):
         out = {k: v[k] for k in (
@@ -442,7 +442,8 @@ def score_all(root, cards=None, now=None):
         "needs_a_card": [clean(v) for v in meta_list if not v["has_card"]],
         "tier_stats": tier_stats,
         "excluded_by_pool_rule": excluded,
-        "reach_list": reach,
+        "next_step_list": next_step,
+        "next_step_closest": next_step_closest,
         "growth_advisor": advisor,
         "near_misses": sorted(why_out.values(), key=lambda row: -row["real_games"])[:15],
     }
@@ -499,22 +500,34 @@ def score_at_mastery(v, card, trait_average, tier_stats, mastery):
     return after, tier_of(spreads)
 
 
-def reach_list(eligible, carded, pick_list, trait_average, tier_stats):
-    """"Could reach A or S": every carded champion now in B, C or D whose Pick Score at Main mastery
-    would land in A or S. Information only; nothing here changes a score."""
-    rows = []
+def next_step_list(eligible, carded, pick_list, trait_average, tier_stats):
+    """"Next step to A or S": every carded champion now in B, C or D whose Pick Score ONE mastery step up
+    (Never played -> Below average -> ... -> Main) would land in A or S. Returns (rows, closest).
+
+    `closest` is the B, C or D champion nearest to the A line after one step (how many points short), or
+    None; the page shows it when the list is empty. The ceiling at Main (`tier_at_main`) is information only
+    and never decides who is listed. Nothing here changes a score.
+    """
+    if not pick_list:
+        return [], None
+    a_line = tier_stats["average_pick_score"] + dict(config.TIER_BOUNDARIES)["A"] * tier_stats["spread"]
+    rows, closest = [], None
     for v in pick_list:
-        if v["tier"] not in ("B", "C", "D"):
+        if v["tier"] not in ("B", "C", "D") or v["mastery"] not in config.GROWTH_TARGET:
             continue
         k = next(key for key, e in eligible.items() if e is v)
-        after, tier = score_at_mastery(v, carded[k], trait_average, tier_stats, "main")
+        step = config.GROWTH_TARGET[v["mastery"]]
+        after, tier = score_at_mastery(v, carded[k], trait_average, tier_stats, step)
         if tier in ("A", "S"):
-            rows.append({"id": v["id"], "name": v["name"], "current_mastery": v["mastery"],
-                         "tier_now": v["tier"], "tier_at_main": tier,
-                         "pick_score_now": v["pick_score"], "pick_score_at_main": after,
-                         "gain": after - v["pick_score"]})
-    rows.sort(key=lambda r: -r["pick_score_at_main"])
-    return rows
+            rows.append({"id": v["id"], "name": v["name"], "current_mastery": v["mastery"], "next_mastery": step,
+                         "tier_now": v["tier"], "tier_next": tier,
+                         "pick_score_now": v["pick_score"], "pick_score_next": after, "gain": after - v["pick_score"],
+                         "tier_at_main": v["best_tier_at_main"]})
+        elif closest is None or after > closest["pick_score_next"]:
+            closest = {"id": v["id"], "name": v["name"], "next_mastery": step, "tier_now": v["tier"],
+                       "pick_score_next": after, "points_short": a_line - after}
+    rows.sort(key=lambda r: -r["pick_score_next"])
+    return rows, (None if rows else closest)
 
 
 def round_floats(value, digits=3):

@@ -371,22 +371,24 @@
     var tierCell = el("td");
     tierCell.appendChild(tierBadge(t.tier_at_target));
     tr.appendChild(tierCell);
+    cell(tr, F.ceilingText(state.byId[t.id]), "detail-col");
     var skill = F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
     cell(tr, skill, "skill");
     body.appendChild(tr);
   }
 
-  function reachRows(t, body) {
+  function nextRows(t, body) {
     var tr = el("tr");
     cell(tr, t.name, "champ");
-    cell(tr, F.masteryText(t.current_mastery));
+    cell(tr, F.masteryText(t.current_mastery) + " \u2192 " + F.masteryText(t.next_mastery));
     var tierCell = el("td");
     tierCell.appendChild(tierBadge(t.tier_now));
     tierCell.appendChild(document.createTextNode(" \u2192 "));
-    tierCell.appendChild(tierBadge(t.tier_at_main));
+    tierCell.appendChild(tierBadge(t.tier_next));
     tr.appendChild(tierCell);
-    cell(tr, F.number(t.pick_score_now, 1) + " \u2192 " + F.number(t.pick_score_at_main, 1), "num");
+    cell(tr, F.number(t.pick_score_now, 1) + " \u2192 " + F.number(t.pick_score_next, 1), "num");
     cell(tr, "+" + F.number(t.gain, 1), "num up");
+    cell(tr, F.ceilingText(state.byId[t.id]), "detail-col");
     cell(tr, F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN), "skill");
     body.appendChild(tr);
   }
@@ -474,6 +476,7 @@
       var copy = {};
       Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
       copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+      copy.ceiling = (state.byId[t.id] || {}).best_tier_at_main;
       return copy;
     });
     tables.growth = sortableTable("growth-table", F.GROWTH_COLUMNS, "g_score", function (t) { return t.pick_score_at_target; }, growthRows);
@@ -482,19 +485,22 @@
     document.getElementById("growth-wrap").hidden = tips.length === 0;
     document.getElementById("growth-empty").hidden = tips.length !== 0;
 
-    var hasReach = Array.isArray(data.reach_list);
-    var reach = (data.reach_list || []).map(function (t) {
+    var hasNext = Array.isArray(data.next_step_list);
+    var next = (data.next_step_list || []).map(function (t) {
       var copy = {};
       Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
       copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+      copy.ceiling = t.tier_at_main;
       return copy;
     });
-    tables.reach = sortableTable("reach-table", F.REACH_COLUMNS, "r_score", function (t) { return t.pick_score_at_main; }, reachRows);
-    tables.reach.list = reach;
-    tables.reach.draw();
-    document.getElementById("reach-wrap").hidden = reach.length === 0;
-    document.getElementById("reach-empty").hidden = !hasReach || reach.length !== 0;
-    document.getElementById("reach-old").hidden = hasReach;
+    tables.next = sortableTable("next-table", F.NEXT_COLUMNS, "n_score", function (t) { return t.pick_score_next; }, nextRows);
+    tables.next.list = next;
+    tables.next.draw();
+    document.getElementById("next-wrap").hidden = next.length === 0;
+    var emptyLine = document.getElementById("next-empty");
+    emptyLine.textContent = F.closestText(data.next_step_closest);
+    emptyLine.hidden = !hasNext || next.length !== 0;
+    document.getElementById("next-old").hidden = hasNext;
 
     drawNotRanked(data);
   }

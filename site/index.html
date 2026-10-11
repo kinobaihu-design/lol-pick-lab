@@ -52,7 +52,7 @@
         Hover a column title for what it means.
         &#9888; = win rate 1.5 points or more below the Diamond+ average (a warning only; the tier doesn't change).
         Games = Diamond+ games on this champion in bot lane, this patch and last patch together.
-        Sample size: Low 1,000&ndash;2,999, Medium 3,000&ndash;9,999, High 10,000+.</p>
+        Sample size: Low under 10,000, Medium 10,000&ndash;29,999, High 30,000+.</p>
       <section id="notranked" hidden>
         <h2>Carded but not ranked</h2>
         <ul id="notranked-list"></ul>
@@ -130,7 +130,7 @@
     <section id="tab-growth" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-growth" hidden>
       <p class="intro">Ideas for getting better at champions with a card. They are advice only and never change any score.</p>
       <h2 class="sectionhead" data-tip-key="top_upgrades">Top upgrades</h2>
-      <p class="intro">Champions that would beat your current #3 pick if you got one mastery level better.</p>
+      <p class="intro">Champions that would beat your current #3 pick one mastery step up (Never played &rarr; Below average &rarr; Average &rarr; Good &rarr; Main).</p>
       <div class="tablewrap" id="growth-wrap">
         <table id="growth-table">
           <thead>
@@ -142,6 +142,7 @@
               <th class="num" data-sort="g_gain">Gain</th>
               <th class="num" data-sort="g_rank">Would rank</th>
               <th data-sort="g_tier">Tier</th>
+              <th class="detail-col" data-sort="g_ceiling">Ceiling</th>
               <th data-sort="g_skill">Skill pays off?</th>
             </tr>
           </thead>
@@ -150,25 +151,26 @@
       </div>
       <p id="growth-empty" class="intro" hidden>No top upgrades right now: nothing you could learn or improve would beat your current #3 pick.</p>
 
-      <h2 class="sectionhead" data-tip-key="could_reach">Could reach A or S</h2>
-      <p class="intro">Champions now in B, C or D that would land in A or S if you played them at Main.</p>
-      <div class="tablewrap" id="reach-wrap">
-        <table id="reach-table">
+      <h2 class="sectionhead" data-tip-key="next_step">Next step to A or S</h2>
+      <p class="intro">Champions now in B, C or D that would land in A or S with just one mastery step up.</p>
+      <div class="tablewrap" id="next-wrap">
+        <table id="next-table">
           <thead>
             <tr>
-              <th data-sort="r_champion">Champion</th>
-              <th data-sort="r_mastery">Mastery now</th>
-              <th data-sort="r_tier">Tier now &rarr; at Main</th>
-              <th class="num" data-sort="r_score">Pick Score</th>
-              <th class="num" data-sort="r_gain">Gain</th>
-              <th data-sort="r_skill">Skill pays off?</th>
+              <th data-sort="n_champion">Champion</th>
+              <th data-sort="n_mastery">Mastery now &rarr; next</th>
+              <th data-sort="n_tier">Tier now &rarr; next</th>
+              <th class="num" data-sort="n_score">Pick Score</th>
+              <th class="num" data-sort="n_gain">Gain</th>
+              <th class="detail-col" data-sort="n_ceiling">Ceiling</th>
+              <th data-sort="n_skill">Skill pays off?</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <p id="reach-empty" class="intro" hidden>No champion in B, C or D would reach A or S at Main right now.</p>
-      <p id="reach-old" class="notice warn" hidden>This scores file is from before this list existed; it appears after the next collector run.</p>
+      <p id="next-empty" class="intro" hidden></p>
+      <p id="next-old" class="notice warn" hidden>This scores file is from before this list existed; it appears after the next collector run.</p>
     </section>
   </div>
 <div id="tip" role="tooltip" hidden></div>

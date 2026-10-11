@@ -1,10 +1,10 @@
-"""Scoring settings (model v0.38). Change numbers here, not in the rest of the code.
+"""Scoring settings (model v0.39). Change numbers here, not in the rest of the code.
 
 Every number below comes from the project brief. If the brief changes, change it here
 and bump MODEL_VERSION.
 """
 
-MODEL_VERSION = "v0.38"
+MODEL_VERSION = "v0.39"
 
 # ---- Pick Score = 0.425 x Stats + 0.525 x Comfort + 0.05 x OTP ----
 WEIGHT_STATS = 0.425
@@ -94,9 +94,10 @@ TIER_BOUNDARIES = [("S", 1.5), ("A", 0.5), ("B", -0.5), ("C", -1.5)]
 WIN_RATE_WARNING_DELTA = -1.5
 
 # ---- Growth advisor ----
-# Only champions with a card (Comfort needs one). Never played and Below average are scored as if
-# Good; Average and Good one level up.
-GROWTH_TARGET = {"never_played": "good", "below_average": "good", "average": "good", "good": "main"}
+# Only champions with a card (Comfort needs one). Both lists (Top upgrades and Next step to A or S) use the
+# NEXT mastery level only (v0.39): Never played -> Below average -> Average -> Good -> Main. Main has no next level.
+# "Ceiling at Main" is shown as information only and never decides who appears in either list.
+GROWTH_TARGET = {"never_played": "below_average", "below_average": "average", "average": "good", "good": "main"}
 # Compared with the owner's current #3 pick.
 GROWTH_BEAT_RANK = 3
 

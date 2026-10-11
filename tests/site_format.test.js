@@ -57,18 +57,20 @@ test("a scores file is recognised, junk is not", () => {
 
 test("the sample-size limits live in settings, in order", () => {
   const l = S.SAMPLE_SIZE_LIMITS;
-  assert.deepStrictEqual([l.low, l.medium, l.high], [1000, 3000, 10000]);
+  assert.deepStrictEqual([l.low, l.medium, l.high], [1000, 10000, 30000]);   // v0.39: Low under 10,000, Medium 10,000-29,999, High 30,000+
 });
 
 const L = S.SAMPLE_SIZE_LIMITS;
 
-test("sample-size label follows the limits at the edges", () => {
+test("sample-size label follows the v0.39 limits at the edges", () => {
   assert.strictEqual(F.sampleLabel(999, L), "Very low");
   assert.strictEqual(F.sampleLabel(1000, L), "Low");
-  assert.strictEqual(F.sampleLabel(2999, L), "Low");
-  assert.strictEqual(F.sampleLabel(3000, L), "Medium");
-  assert.strictEqual(F.sampleLabel(9999, L), "Medium");
-  assert.strictEqual(F.sampleLabel(10000, L), "High");
+  assert.strictEqual(F.sampleLabel(3000, L), "Low");              // was Medium before v0.39
+  assert.strictEqual(F.sampleLabel(9999, L), "Low");
+  assert.strictEqual(F.sampleLabel(10000, L), "Medium");
+  assert.strictEqual(F.sampleLabel(29999, L), "Medium");
+  assert.strictEqual(F.sampleLabel(30000, L), "High");
+  assert.strictEqual(F.sampleLabel(105238, L), "High");
 });
 
 test("mastery names and trait badges", () => {
@@ -308,18 +310,31 @@ test("best reachable tier is told only for champions that can't reach A at Main"
   assert.strictEqual(F.bestReachText({}), "");
 });
 
-test("Could reach A or S table sorts by every column; empty skill goes last", () => {
+test("Next step to A or S table sorts by every column; empty skill goes last", () => {
   const list = [
-    { name: "Kai", current_mastery: "average", tier_at_main: "A", pick_score_at_main: 75, gain: 6, skill_delta: 3 },
-    { name: "Zed", current_mastery: "never_played", tier_at_main: "S", pick_score_at_main: 80, gain: 14, skill_delta: null },
-    { name: "Bob", current_mastery: "good", tier_at_main: "A", pick_score_at_main: 72, gain: 4, skill_delta: 1 }
+    { name: "Kai", current_mastery: "average", ceiling: "A", pick_score_next: 75, gain: 3, tier_next: "A", skill_delta: 3 },
+    { name: "Zed", current_mastery: "never_played", ceiling: "S", pick_score_next: 80, gain: 4, tier_next: "S", skill_delta: null },
+    { name: "Bob", current_mastery: "good", ceiling: "B", pick_score_next: 72, gain: 2, tier_next: "A", skill_delta: 1 }
   ];
-  const by = (k, d) => F.sortRows(list, k, d, F.REACH_COLUMNS, t => t.pick_score_at_main).map(t => t.name).join("");
-  assert.strictEqual(by("r_score", "desc"), "ZedKaiBob");
-  assert.strictEqual(by("r_tier", "desc"), "ZedKaiBob");
-  assert.strictEqual(by("r_gain", "asc"), "BobKaiZed");
-  assert.strictEqual(by("r_champion", "asc"), "BobKaiZed");
-  assert.strictEqual(by("r_mastery", "asc"), "ZedKaiBob");     // weakest mastery first
-  assert.strictEqual(by("r_skill", "desc"), "KaiBobZed");
-  assert.strictEqual(by("r_skill", "asc"), "BobKaiZed");
+  const by = (k, d) => F.sortRows(list, k, d, F.NEXT_COLUMNS, t => t.pick_score_next).map(t => t.name).join("");
+  assert.strictEqual(by("n_score", "desc"), "ZedKaiBob");
+  assert.strictEqual(by("n_tier", "desc"), "ZedKaiBob");
+  assert.strictEqual(by("n_gain", "asc"), "BobKaiZed");
+  assert.strictEqual(by("n_champion", "asc"), "BobKaiZed");
+  assert.strictEqual(by("n_mastery", "asc"), "ZedKaiBob");     // weakest mastery first
+  assert.strictEqual(by("n_ceiling", "desc"), "ZedKaiBob");
+  assert.strictEqual(by("n_skill", "desc"), "KaiBobZed");
+  assert.strictEqual(by("n_skill", "asc"), "BobKaiZed");
+  assert.strictEqual(F.REACH_COLUMNS, undefined);
+});
+
+test("ceiling at Main is a quiet text; the closest line says who is nearest", () => {
+  assert.strictEqual(F.ceilingText({ best_tier_at_main: "S" }), "at Main: S");
+  assert.strictEqual(F.ceilingText({}), "");
+  assert.strictEqual(F.ceilingText(undefined), "");
+  assert.strictEqual(F.closestText({ name: "Lucian", points_short: 1.234 }), "None this patch \u00b7 closest: Lucian, 1.2 points short");
+  assert.strictEqual(F.closestText(null), "None this patch");
+  // the Growth Top upgrades table can be sorted by the ceiling too
+  const rows = [{ name: "A", ceiling: "B" }, { name: "B", ceiling: "S" }];
+  assert.strictEqual(F.sortRows(rows, "g_ceiling", "desc", F.GROWTH_COLUMNS, () => 0).map(r => r.name).join(""), "BA");
 });

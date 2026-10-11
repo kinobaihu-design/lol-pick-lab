@@ -78,7 +78,7 @@
     return out;
   }
 
-  // "Low", "Medium" or "High" by real games (this patch + last patch, before any double weight).
+  // "Low" (under the medium limit), "Medium" or "High" by real games (this patch + last patch, before any double weight).
   // Below the Low limit the sample is "Very low" (such champions are normally not ranked at all).
   function sampleLabel(realGames, limits) {
     var n = Number(realGames);
@@ -296,6 +296,17 @@
     return "Patch " + patch + " \u00b7 most champions " + mix.low + "\u2013" + mix.high + "% this patch";
   }
 
+  // The quiet extra on Growth rows: "at Main: S" (the ceiling; information only, never decides who is listed).
+  function ceilingText(champ) {
+    return champ && champ.best_tier_at_main ? "at Main: " + champ.best_tier_at_main : "";
+  }
+
+  // The one line shown when "Next step to A or S" is empty.
+  function closestText(closest) {
+    if (!closest) return "None this patch";
+    return "None this patch \u00b7 closest: " + closest.name + ", " + number(closest.points_short, 1) + " points short";
+  }
+
   // Hover text on a name in the Tier list for a champion that can't reach A even at Main.
   function bestReachText(champ) {
     if (!champ.best_tier_at_main || champ.best_tier_at_main === "A" || champ.best_tier_at_main === "S") return "";
@@ -355,16 +366,18 @@
     g_gain:   { first: "desc", value: function (t) { return t.gain; } },
     g_rank:   { first: "asc", value: function (t) { return t.would_rank; } },
     g_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_at_target); } },
+    g_ceiling: { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.ceiling); } },
     g_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
   };
 
-  var REACH_COLUMNS = {
-    r_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
-    r_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
-    r_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_at_main); } },
-    r_score:  { first: "desc", value: function (t) { return t.pick_score_at_main; } },
-    r_gain:   { first: "desc", value: function (t) { return t.gain; } },
-    r_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
+  var NEXT_COLUMNS = {
+    n_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
+    n_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
+    n_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_next); } },
+    n_score:  { first: "desc", value: function (t) { return t.pick_score_next; } },
+    n_gain:   { first: "desc", value: function (t) { return t.gain; } },
+    n_ceiling: { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.ceiling); } },
+    n_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
   };
 
   function firstDirection(key, columns) {
@@ -402,10 +415,10 @@
               masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
               sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS,
-              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, REACH_COLUMNS: REACH_COLUMNS,
+              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, NEXT_COLUMNS: NEXT_COLUMNS,
               normalise: normalise, cardInfo: cardInfo, applyCards: applyCards, meanAndSpread: meanAndSpread,
               spreadStep: spreadStep, stepClass: stepClass, patchMix: patchMix, patchMixText: patchMixText,
-              bestReachText: bestReachText,
+              bestReachText: bestReachText, ceilingText: ceilingText, closestText: closestText,
               typeText: typeText, mainTypeText: mainTypeText, secondaryTypeText: secondaryTypeText,
               difficultyText: difficultyText, masteryPointsText: masteryPointsText, flexText: flexText,
               needsCard: needsCard, otpWinRateText: otpWinRateText, skillDelta: skillDelta,

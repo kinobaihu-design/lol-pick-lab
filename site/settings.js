@@ -7,8 +7,9 @@
     // A saved copy shipped with the page, used only when DATA_URL can't be reached (the page says so).
     FALLBACK_URL: "data/latest.json",
     // Sample-size labels, by real games (this patch + last patch together, before any double
-    // weight): Low from 1,000, Medium from 3,000, High from 10,000. Retune them here.
-    SAMPLE_SIZE_LIMITS: { low: 1000, medium: 3000, high: 10000 },
+    // weight): Low under 10,000, Medium 10,000-29,999, High 30,000+ (from v0.39). `low` is only the
+    // 1,000-game ranking floor: below it the label would be "Very low". Retune them here.
+    SAMPLE_SIZE_LIMITS: { low: 1000, medium: 10000, high: 30000 },
     // The collector saves every 6 hours; if the scores are older than this, the page warns.
     STALE_AFTER_HOURS: 13,
     // A win rate this many points (or more) below the Diamond+ average gets a warning sign.
@@ -24,7 +25,7 @@
     CARDS_URL: "data/cards.json",
     // The page needs a scores file from at least this model version. If the live file is older and the
     // saved copy is newer, the saved copy is shown (with a notice) until the next collector run.
-    MIN_MODEL_VERSION: "v0.38"
+    MIN_MODEL_VERSION: "v0.39"
   };
   if (typeof module !== "undefined" && module.exports) module.exports = SETTINGS;
   else root.SETTINGS = SETTINGS;

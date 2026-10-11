@@ -1,5 +1,5 @@
 // The hover texts for the column titles. All of them live here, so they can be updated with every
-// model version (currently v0.38). A test checks that the weights written below match the scoring code.
+// model version (currently v0.39). A test checks that the weights written below match the scoring code.
 (function (root) {
   var HELP = {
     rank: "Place in the list by Pick Score (1 = best pick). It keeps its number when you sort by another column.",
@@ -11,7 +11,7 @@
     otp: "How much better one-tricks do on this champion than average players, ranked 0–100 and pulled toward 50 when there are few OTP games. Worth 5% of the Pick Score. (The games counted are the one-tricks' bot-lane games.)",
     win_rate: "Diamond+ win rate in bot lane. It feeds Stats (75% of Stats). ⚠ = 1.5 points or more below the Diamond+ average: a warning only, the tier does not change.",
     vs_average: "Win rate minus the Diamond+ average. Every point above or below moves the win rate points in Stats by 12.5.",
-    games: "Real Diamond+ bot-lane games, this patch and last patch together. Sample size: Low 1,000–2,999, Medium 3,000–9,999, High 10,000+. Not part of the score; a champion needs 1,000 to be ranked.",
+    games: "Real Diamond+ bot-lane games, this patch and last patch together. Sample size: Low under 10,000, Medium 10,000–29,999, High 30,000+. Not part of the score; a champion needs 1,000 to be ranked.",
 
     // ---- tabs ----
     tab_tier: "Your Pick Score ranking: data (42.5%), your Comfort (52.5%) and one-tricks (5%) together. Only champions with a card.",
@@ -47,20 +47,23 @@
     // ---- Growth tab ----
     g_champion: "A champion with a card that is not yet a Main.",
     g_kind: "Upgrade = you already play it and could get better. New champion = you have never played it.",
-    g_mastery: "Your mastery now. The target is one level up: Never played and Below average are scored as Good, Average as Good, Good as Main.",
-    g_score: "Pick Score now → Pick Score at the target mastery. A tip appears only when the target score beats your current #3 pick.",
-    g_gain: "How many Pick Score points the champion would gain at the target mastery.",
-    g_rank: "Where it would rank in the tier list at the target mastery.",
-    g_tier: "Its tier at the target mastery, against this patch's average Pick Score.",
+    g_mastery: "Your mastery now. The target is always the next level: Never played → Below average → Average → Good → Main.",
+    g_score: "Pick Score now → Pick Score at the next mastery level. A tip appears only when the new score beats your current #3 pick.",
+    g_gain: "How many Pick Score points the champion would gain one mastery step up.",
+    g_rank: "Where it would rank in the tier list one mastery step up.",
+    g_tier: "Its tier one mastery step up, against this patch's average Pick Score.",
     g_skill: "Information only, no effect on any score. How much better one-tricks win than average players, then how many OTPs and their bot-lane games. Shown only with 20 or more bot-lane OTP games.",
-    top_upgrades: "Same rule as before: one mastery level up (Never played, Below average and Average go to Good, Good goes to Main), shown only when the new Pick Score beats your current #3 pick.",
-    could_reach: "Every carded champion now in B, C or D whose Pick Score at Main mastery would land in A or S. Same scoring code as the tier list; only the mastery changes.",
-    r_champion: "A champion with a card, now in B, C or D.",
-    r_mastery: "Your mastery now. The list always assumes Main.",
-    r_tier: "Its tier now → its tier at Main mastery, against this patch's average Pick Score.",
-    r_score: "Pick Score now → Pick Score at Main mastery.",
-    r_gain: "Pick Score points gained at Main mastery.",
-    r_skill: "Information only, no effect on any score. How much better one-tricks win than average players, shown only with 20 or more bot-lane OTP games.",
+    top_upgrades: "One mastery step up only (Never played → Below average → Average → Good → Main). Shown only when the new Pick Score beats your current #3 pick.",
+    next_step: "Every carded champion now in B, C or D whose Pick Score one mastery step up would land in A or S. Same scoring code as the tier list; only the mastery changes. If nobody qualifies, the page names the closest one.",
+    n_champion: "A champion with a card, now in B, C or D.",
+    n_mastery: "Your mastery now → the next level (one step only).",
+    n_tier: "Its tier now → its tier one mastery step up, against this patch's average Pick Score.",
+    n_score: "Pick Score now → Pick Score one mastery step up.",
+    n_gain: "Pick Score points gained one mastery step up.",
+    n_skill: "Information only, no effect on any score. How much better one-tricks win than average players, shown only with 20 or more bot-lane OTP games.",
+
+    g_ceiling: "Quiet extra, information only: the best tier the champion could reach at Main mastery. It never decides who appears in either list.",
+    n_ceiling: "Quiet extra, information only: the best tier the champion could reach at Main mastery. It never decides who appears in either list.",
 
     // ---- patch mix and data label ----
     patch_mix: "Most champions (the middle 80%) get this share of their numbers from this patch; the rest comes from last patch. Share of this patch = this patch's games ÷ (this patch's games + 1,000).",

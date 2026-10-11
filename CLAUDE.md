@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.38**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.39**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -86,7 +86,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
 6. **Tier (v0.36): the Pick Score only.** Each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** +1.5 spreads or more · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. There is no stats floor and no win rate condition on S any more. **Win rate warning (display only):** a champion whose win rate is 1.5% or more below the Diamond+ average shows a ⚠ next to its win rate; it never changes the tier (`WIN_RATE_WARNING_DELTA` in `scoring/config.py`). The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`).
 
 **Other lists:**
-- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at a target mastery: Never played and Below average as if Good; Average and Good one level up. It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Good"). There are two kinds of advice:
+- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at the NEXT mastery level only (v0.39): Never played → Below average → Average → Good → Main (before v0.39 Never played and Below average jumped straight to Good). It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Below average" is the same idea, one step). There are two kinds of advice:
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
@@ -270,6 +270,16 @@ Pasted from the owner; the live brief has the full details.
 - "Skill pays off" shown compact (e.g. "OTP +4.6% · 12 OTPs · 340 games"), still hidden below 20 bot-lane OTP games.
 - Slice 3 polish: patch-mix line at the top; colored Meta Score and Comfort boxes (tier steps ±0.5 / ±1.5 spreads); Comfort tab reordered; card-only information read straight from the cards; "best reachable" hover on the Tier list; old ban code removed.
 
+## Brief changes v0.39 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- Growth advisor uses the next mastery level only, for both lists: Never played → Below average → Average → Good → Main. Never played and Below average no longer jump straight to Good (`GROWTH_TARGET` in `scoring/config.py`).
+- "Could reach A or S" is renamed **"Next step to A or S"** and uses one step up, not Main. If it is empty the page shows one line: "None this patch · closest: <champion>, <x> points short" (the B/C/D champion nearest the A line after one step).
+- **"Ceiling at Main"** is kept as information only (a quiet "at Main: S" on each Growth row; "Best reachable" hover on the Tier list). It never decides who appears in either list.
+- Sample-size labels: **Low under 10,000, Medium 10,000–29,999, High 30,000+** real games (this patch + last patch). One setting: `SAMPLE_SIZE_LIMITS` in `site/settings.js` (`low: 1000` is only the ranking floor).
+- No change to the Pick Score.
+
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
 
 - Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
@@ -293,7 +303,7 @@ Pasted from the owner; the live brief has the full details.
   - **Colored boxes** for the Meta Score (Meta tab, Needs a card) and Comfort (Comfort tab): green above the average, red below, stronger each 0.5 and 1.5 spreads away (`SPREAD_STEPS` in `site/settings.js`, equal to the tier boundaries; a test checks). Average and spread come from the champions on that tab.
   - **Cards are read straight from `site/data/cards.json`** (a copy of `scoring/cards.json`; **copy it again whenever a card changes, a test fails if they differ**). Type, strength, secondary type, traits, mastery, difficulty ratings and range come from there, so those never wait for the collector. The Comfort *numbers* (type points, base, kit adj.…) still come from `comfort_parts` in the scores file, so a changed card shows its new numbers after the next collector run. `card_info` is no longer written to the scores file.
   - **Comfort tab order:** Champion · Comfort (colored box) · Trait score with trait badges · Mastery dots · then the smaller, lighter detail columns. Sorted by Comfort, highest first.
-  - **Growth tab:** two tables: **Top upgrades** (as before) and **Could reach A or S** (`reach_list` in the scores file: carded champions now in B, C or D whose Pick Score at Main lands in A or S; shows tier now → at Main and the gain). The scores file also gives every carded champion `pick_score_at_main` and `best_tier_at_main` (same Comfort and Pick Score code, only the mastery changes; the tier is read against the patch's current average and spread). The Tier list shows "Best reachable: B at Main" in a hover bubble on the name of a champion that can't reach A even at Main.
+  - **Growth tab (v0.39):** two tables. **Top upgrades**: the next mastery level only, shown only when the new Pick Score beats the current #3 pick. **Next step to A or S** (`next_step_list` in the scores file): carded champions now in B, C or D whose Pick Score one step up lands in A or S (tier now → next, gain); when empty, `next_step_closest` gives the "None this patch · closest: …" line. Both show a quiet **Ceiling** column ("at Main: S", from `best_tier_at_main`, information only). The scores file gives every carded champion `pick_score_at_main` and `best_tier_at_main` (same Comfort and Pick Score code, only the mastery changes; tier read against the patch's current average and spread). The Tier list shows "Best reachable: B at Main" in a hover bubble on the name of a champion that can't reach A even at Main.
   - **Which scores file:** the live file is used; only if it is from an older model version than `MIN_MODEL_VERSION` (settings) and the saved copy is newer, the saved copy is shown with a notice until the next collector run.
   - The old, unused ban code (Ban threat) was removed from `scoring/` and its tests.
 - **Local preview:** the preview program can't read the Documents folder, so it serves a copy at `~/.lol-pick-lab-preview` (see `.claude/launch.json`, port 8124). **Run `scripts/sync_preview.sh` after every change to `site/`**, or the preview shows old code (this is why the slice-2 hover help looked missing: the old preview served a frozen copy).
@@ -315,7 +325,7 @@ Pasted from the owner; the live brief has the full details.
 **Phase 2, tier list website (first shareable version)**
 - [x] Claude writes the scoring model as code (`scoring/`, see "Scoring code")
 - [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
-- [ ] Build the bot-lane tier list page in 3 slices (`site/`): Pick Score with Comfort next to it (Pick Score stays the main number), Meta Score and the Growth advisor (ban suggestions moved to later in v0.37), plus games played, a sample-size label by real games (this patch + last patch together: Low 1,000–2,999, Medium 3,000–9,999, High 10,000+; one setting in the code so it can be retuned), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score. PC first (phone only needs to be readable), English only.
+- [ ] Build the bot-lane tier list page in 3 slices (`site/`): Pick Score with Comfort next to it (Pick Score stays the main number), Meta Score and the Growth advisor (ban suggestions moved to later in v0.37), plus games played, a sample-size label by real games (this patch + last patch together: Low under 10,000, Medium 10,000–29,999, High 30,000+ since v0.39; one setting in the code so it can be retuned), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score. PC first (phone only needs to be readable), English only.
   - [x] Slice 1: basic tier table (Oct 11)
   - [x] Slice 2: mastery shown as 1–5 colored dots under Comfort, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
   - [x] Slice 3: tabs Tier list · Meta · Comfort · Growth, Meta Score with Needs a card, Comfort breakdown, Growth advisor with "skill pays off", "too few games" below 20 OTP games (Oct 11, v0.37). Ban suggestions removed from this phase.
@@ -350,7 +360,7 @@ Pasted from the owner; the live brief has the full details.
 - **Cards per role (Phase 2 design note from the owner):** store champion cards per champion + role, with the same card structure, but each role has its own types, trait list and priorities. A champion can have a bot-lane card and a support card.
 
 - **Collector health:** no email alerts (decided Oct 11). Check the collector by eye when the site looks stale; the page shows a "Last updated" time and warns when it is old.
-- **Sample-size limits:** recheck the Low / Medium / High limits (1,000 / 3,000 / 10,000 real games) after a few patches.
+- **Sample-size limits:** recheck the Low / Medium / High limits (changed in v0.39 to under 10,000 / 10,000 / 30,000 real games) after a few patches.
 
 **Review once all ADC cards are done**
 - Review the types, type strengths, traits, priorities and levels together, and check that the rules still fit.
@@ -373,6 +383,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.39** (Oct 11, 2026): no score change. Growth advisor uses the next mastery level only (both lists); "Could reach A or S" becomes "Next step to A or S" with a "closest" line when empty; ceiling at Main kept as information only; sample-size labels Low under 10,000, Medium 10,000–29,999, High 30,000+.
 - **v0.38** (Oct 11, 2026): no score change. Growth advisor split into Top upgrades and Could reach A or S (Main mastery lands in A or S); skill pays off shown compact; ban code removed.
 - **v0.37** (Oct 11, 2026): no score change. Ban suggestions moved to later. Growth advisor gets an information-only "skill pays off" signal (OTP win rate − overall win rate, shown with 20+ bot-lane OTP games). OTP win rate shows "too few games" below 20 bot-lane OTP games. Tier list page gets tabs (slice 3).
 - **v0.36** (Oct 11, 2026): the tier follows the Pick Score only. Stats floor removed (no more B cap, no more "*") and the S condition "win rate at or above the Diamond+ average" removed. Tiers: S +1.5 spreads or more, A +0.5 to +1.5, B −0.5 to +0.5, C −1.5 to −0.5, D below −1.5. New display-only ⚠ next to a win rate 1.5% or more below the Diamond+ average. On patch 16.20 data only Caitlyn changes tier (B* → A).
