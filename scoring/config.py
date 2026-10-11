@@ -1,29 +1,30 @@
-"""Scoring settings (model v0.34). Change numbers here, not in the rest of the code.
+"""Scoring settings (model v0.35). Change numbers here, not in the rest of the code.
 
 Every number below comes from the project brief. If the brief changes, change it here
 and bump MODEL_VERSION.
 """
 
-MODEL_VERSION = "v0.34"
+MODEL_VERSION = "v0.35"
 
-# ---- Pick Score = 0.4 x Stats + 0.5 x Comfort + 0.1 x OTP ----
-WEIGHT_STATS = 0.4
-WEIGHT_COMFORT = 0.5
-WEIGHT_OTP = 0.1
+# ---- Pick Score = 0.425 x Stats + 0.525 x Comfort + 0.05 x OTP ----
+WEIGHT_STATS = 0.425
+WEIGHT_COMFORT = 0.525
+WEIGHT_OTP = 0.05
 
 # ---- Filters (a champion must pass all four to be ranked) ----
 MIN_REAL_GAMES = 1000     # real games (before the double weight), this patch + last patch together
 MIN_LANE_SHARE = 0.10     # share of the champion's games played in the lane (blended)
-MIN_PICK_RATE = 0.01      # pick rate (blended)
-# What "pick rate" means. The brief doesn't say, so this is a choice:
-#   "games" = share of all games the champion appears in (Riot / Lolalytics style). Every
-#             game has two bot laners, so this is twice the lane share below.
-#   "lane"  = share of all bot-lane picks. The picks of all champions add up to 100%.
-# Only the 1% filter cares: the Stats ranking (0-100) is the same either way.
+MIN_PICK_RATE = 0.008     # pick rate (blended); also the bar for the ban list
+# What "pick rate" means (brief v0.35): the champion's bot-lane games / all games. Games the
+# champion plays in other roles never count. Only Diamond+ players are stored (about 7.4 of the
+# 10 players per game), so "all games" is estimated as Diamond+ participants / 10; that keeps
+# the numerator and the denominator on the same footing. Dividing by the raw number of games
+# counted instead would make every pick rate about 25% smaller.
+# "games" = the rule above. "lane" = share of all bot-lane picks instead (half as big).
 PICK_RATE_BASIS = "games"
 
 # Champions the owner keeps out of the bot-lane pool ("Melee champions (Yasuo, Katarina) stay
-# out of my bot-lane pool", brief v0.34). They still pass the filters on data, so they are
+# out of my bot-lane pool", brief v0.34, confirmed in v0.35). They still pass the filters on data, so they are
 # listed separately and left out of every ranking, average and suggestion.
 EXCLUDED_FROM_POOL = ["Yasuo", "Katarina"]   # Riot's internal names
 
@@ -31,12 +32,12 @@ EXCLUDED_FROM_POOL = ["Yasuo", "Katarina"]   # Riot's internal names
 # share of this patch = this patch's games / (this patch's games + BLEND_K)
 BLEND_K = 1000
 
-# ---- Stats (40%) ----
+# ---- Stats (42.5%) ----
 STATS_WIN_RATE_SHARE = 0.75
 STATS_PICK_RATE_SHARE = 0.25
 WIN_RATE_POINTS_PER_PERCENT = 12.5   # points per 1% above / below the Diamond+ average
 
-# ---- Comfort (50%) ----
+# ---- Comfort (52.5%) ----
 TYPE_POINTS = {
     "mobility": 100,
     "peel": 90,
@@ -77,19 +78,27 @@ DIFFICULTY_RIOT_SHARE = 0.2
 RANGE_ADJUSTMENT = {"short": -0.5, "medium": 0.0, "long": 0.5}
 FLEXIBILITY_BONUS = 1.0              # x the mastery's flexibility factor (flexible builds only)
 
-# ---- OTP (10%) ----
+# ---- OTP (5%) ----
 OTP_MIN_SHARE_OF_RECENT_GAMES = 0.55   # recent = this patch + last patch
 OTP_MIN_SEASON_GAMES = 50
 OTP_RELIABILITY_K = 300                # reliability = OTP games / (OTP games + K)
 
-# ---- Tiers ----
-TIER_CUTOFFS = [("S", 80.0), ("A", 72.0), ("B", 64.0), ("C", 56.0)]   # below the last one: D
+# ---- Tiers (v0.35) ----
+# A champion's tier comes from how far its Pick Score is from this patch's average Pick Score,
+# measured in standard deviations ("spreads"). Only champions with a Pick Score (a card) count.
+# Each pair is (tier, lowest number of spreads for it); below the last one is D.
+TIER_BOUNDARIES = [("S", 1.5), ("A", 0.5), ("B", -0.5), ("C", -1.5)]
+# S also needs a win rate at or above the Diamond+ average; if it is below, the tier is A.
+S_MIN_WIN_RATE_DELTA = 0.0
 STATS_FLOOR = -1.5                     # win rate this far (or more) below the average caps the tier
 STATS_FLOOR_TIER = "B"
 TIER_RANK = {"S": 0, "A": 1, "B": 2, "C": 3, "D": 4}
+# The old v0.34 fixed cutoffs on the Pick Score. Used only by the comparison table.
+OLD_FIXED_CUTOFFS = [("S", 80.0), ("A", 72.0), ("B", 64.0), ("C", 56.0)]
 
 # ---- Growth advisor ----
-# Never played and Below average are scored as if Good; Average and Good one level up.
+# Only champions with a card (Comfort needs one). Never played and Below average are scored as if
+# Good; Average and Good one level up.
 GROWTH_TARGET = {"never_played": "good", "below_average": "good", "average": "good", "good": "main"}
 # Compared with the owner's current #3 pick.
 GROWTH_BEAT_RANK = 3

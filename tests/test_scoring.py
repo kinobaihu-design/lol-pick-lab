@@ -80,14 +80,41 @@ class SmallHelperTests(unittest.TestCase):
         self.assertAlmostEqual(points["b"], points["c"])
         self.assertEqual(model.percentile_points({"x": 5}), {"x": 50.0})
 
-    def test_tiers_and_floor(self):
-        self.assertEqual(model.tier_of(80.0)[0], "S")
-        self.assertEqual(model.tier_of(79.96)[0], "S")   # shown as 80.0
-        self.assertEqual(model.tier_of(72.0)[0], "A")
-        self.assertEqual(model.tier_of(55.9)[0], "D")
-        self.assertEqual(model.tier_of(85, -1.4)[0], "S")
-        self.assertEqual(model.tier_of(85, -1.5), ("B", True))
-        self.assertEqual(model.tier_of(60, -3), ("C", False))   # the floor only lowers
+    def test_spreads_and_tiers(self):
+        self.assertEqual(model.spreads_from_average(75, 65, 5), 2.0)
+        self.assertEqual(model.spreads_from_average(75, 65, 0), 0.0)        # no spread at all
+        self.assertEqual(model.tier_of(1.5, 0.5)[0], "S")                   # boundaries count as inside
+        self.assertEqual(model.tier_of(1.49, 0.5)[0], "A")
+        self.assertEqual(model.tier_of(0.5)[0], "A")
+        self.assertEqual(model.tier_of(0.49)[0], "B")
+        self.assertEqual(model.tier_of(-0.5)[0], "B")
+        self.assertEqual(model.tier_of(-0.51)[0], "C")
+        self.assertEqual(model.tier_of(-1.5)[0], "C")
+        self.assertEqual(model.tier_of(-1.51)[0], "D")
+
+    def test_s_needs_a_win_rate_at_or_above_the_average(self):
+        self.assertEqual(model.tier_of(2.0, 0.0)[0], "S")
+        self.assertEqual(model.tier_of(2.0, -0.01)[0], "A")                 # strong score, weak win rate
+        self.assertEqual(model.tier_of(2.0, -1.4)[0], "A")
+
+    def test_stats_floor(self):
+        self.assertEqual(model.tier_of(1.0, -1.5), ("B", True))
+        self.assertEqual(model.tier_of(0.0, -3), ("B", False))              # already B
+        self.assertEqual(model.tier_of(-1.0, -3), ("C", False))             # the floor only lowers
+
+    def test_other_boundaries_and_old_cutoffs(self):
+        wide = [("S", 1.0), ("A", 0.5), ("B", -0.5), ("C", -1.0)]
+        self.assertEqual(model.tier_of(1.0, 1.0, wide)[0], "S")
+        self.assertEqual(model.tier_of(-1.0, 1.0, wide)[0], "C")
+        self.assertEqual(model.old_fixed_tier_of(80.0), "S")
+        self.assertEqual(model.old_fixed_tier_of(79.96), "S")               # shown as 80.0
+        self.assertEqual(model.old_fixed_tier_of(55.9), "D")
+        self.assertEqual(model.old_fixed_tier_of(85, -1.5), "B")
+
+    def test_weights_add_up(self):
+        self.assertAlmostEqual(config.WEIGHT_STATS + config.WEIGHT_COMFORT + config.WEIGHT_OTP, 1.0)
+        self.assertEqual((config.WEIGHT_STATS, config.WEIGHT_COMFORT, config.WEIGHT_OTP), (0.425, 0.525, 0.05))
+        self.assertEqual(config.MIN_PICK_RATE, 0.008)
 
 
 class EndToEndTests(unittest.TestCase):
@@ -156,7 +183,33 @@ class EndToEndTests(unittest.TestCase):
         self.assertFalse(swain["has_card"])
         self.assertEqual(swain["label"], "no card yet")
         self.assertNotIn("pick_score", swain)
-        self.assertEqual(result["uncarded_champions"][0]["name"], "Swain")
+        self.assertEqual(result["needs_a_card"][0]["name"], "Swain")
+
+    def test_pick_rate_counts_bot_lane_games_only(self):
+        old = config.MIN_REAL_GAMES
+        config.MIN_REAL_GAMES = 300
+        try:
+            result = model.score_all(self.root)
+        finally:
+            config.MIN_REAL_GAMES = old
+        swain = next(c for c in result["meta_score_list"] if c["name"] == "Swain")
+        patch = model.Patch(self.root, "16.20")
+        # this patch: 2 x 60 + 60 weighted bot-lane games; games = participants / 10
+        expected = (2 * 60 + 60) / (patch.participants_weighted / 10)
+        self.assertAlmostEqual(model.lane_pick_rate(patch, model.lane_numbers(patch, "50", "BOTTOM")), expected)
+
+    def test_tiers_and_advisor_only_use_champions_with_a_card(self):
+        old = config.MIN_REAL_GAMES
+        config.MIN_REAL_GAMES = 300
+        try:
+            result = model.score_all(self.root)
+        finally:
+            config.MIN_REAL_GAMES = old
+        self.assertEqual(result["tier_stats"]["champions"], 1)
+        self.assertEqual([c["name"] for c in result["pick_score_list"]], ["Jinx"])
+        self.assertEqual(result["pick_score_list"][0]["spreads"], 0.0)
+        self.assertEqual(result["growth_advisor"], [])
+        self.assertNotIn("uncarded_champions", result)
 
     def test_otp_rule(self):
         old = config.MIN_REAL_GAMES
@@ -195,6 +248,8 @@ class EndToEndTests(unittest.TestCase):
             config.MIN_REAL_GAMES = old
         for row in result["ban_threat_list"]:
             self.assertGreater(row["win_rate_delta"], 0)
+            self.assertIn(row["role"], model.ROLE_NAMES.values())
+            self.assertTrue(0 < row["main_role_share"] <= 1)
         self.assertEqual(result["ban_threat_list"], sorted(result["ban_threat_list"], key=lambda r: -r["ban_threat"]))
 
 

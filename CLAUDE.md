@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.34**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.35**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -67,30 +67,31 @@ The final site covers 3 roles: bot lane (ADC and APC), support and jungle, built
 - Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
-## Scoring model v0.34 (bot lane: ADC and APC): the full recipe
+## Scoring model v0.35 (bot lane: ADC and APC): the full recipe
 
 Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs and share the same trait average. Every part is scored 0–100, then weighted. The order of the steps:
 
-1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 **real** games across this patch and last patch together (counted before the double weight), ≥1% pick rate. Lane share and pick rate use the same blended numbers (see "Patch blending"); the data-freshness label shows how much is this patch. The sample-size label (low, medium, high) also uses real games. The double weight (LAN, KR, NA, EUW ×2) still applies to all stats.
-2. **Stats (40%)** = 75% win rate points + 25% pick rate. Win rate says how strong a champion is; pick rate says it's proven and popular. (PBI was removed in v0.33.)
+1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 **real** games across this patch and last patch together (counted before the double weight), ≥0.8% pick rate. Lane share and pick rate use the same blended numbers (see "Patch blending"); the data-freshness label shows how much is this patch. The sample-size label (low, medium, high) also uses real games. The double weight (LAN, KR, NA, EUW ×2) still applies to all stats.
+2. **Stats (42.5%)** = 75% win rate points + 25% pick rate. Win rate says how strong a champion is; pick rate says it's proven and popular. (PBI was removed in v0.33.)
    - Win rate points = `50 + 12.5 × (win rate − Diamond+ average)`, clamped to 0–100: +4% → 100, +2% → 75, average → 50, −2% → 25, −4% → 0. The Diamond+ average comes from our own data each patch (expected to sit above 50%; Lolalytics shows 52.27%).
+   - **Pick rate** = the champion's bot-lane games ÷ all games (v0.35). Games it plays in other roles never count. Only Diamond+ players are stored (about 7.4 of 10 per game), so "all games" is estimated as Diamond+ participants ÷ 10; dividing by the raw games counted would make every pick rate about 25% smaller.
    - Pick rate is ranked 0–100 among the eligible bot-lane champions (ADCs and APCs). Ban rate isn't part of the Pick Score.
    - **Meta Score** = the Stats points alone (the data-only ranking). Every champion that passes the filters gets one, with or without a card.
-3. **Comfort (50%)** comes from the champion cards (see "Comfort in detail"), capped at 100.
-4. **OTP (10%)** = OTP win rate − overall win rate, ranked 0–100 among eligible champions (raw OTP points), then pulled toward 50 by its reliability:
+3. **Comfort (52.5%)** comes from the champion cards (see "Comfort in detail"), capped at 100.
+4. **OTP (5%)** = OTP win rate − overall win rate, ranked 0–100 among eligible champions (raw OTP points), then pulled toward 50 by its reliability:
    - `OTP points = 50 + (raw OTP points − 50) × reliability`, where `reliability = OTP games ÷ (OTP games + 300)`. 100 OTP games → 25%; 300 → 50%; 1,000 → 77%; 3,000 → 91%.
    - **OTP rule (for now):** a Diamond+ player is an OTP of a champion when at least 55% of their recent ranked games are on it, and they have at least 50 games on it this season.
    - The tier list shows the number of OTP players and OTP games behind each OTP score.
-5. **Pick Score** = `0.4 × Stats + 0.5 × Comfort + 0.1 × OTP`.
-6. **Tier:** S ≥ 80 · A 72–79.9 · B 64–71.9 · C 56–63.9 · D < 56. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The cutoffs and the floor are first guesses, calibrated in Phase 2 against the owner's gut ranking of 10 ADCs.
+5. **Pick Score** = `0.425 × Stats + 0.525 × Comfort + 0.05 × OTP`.
+6. **Tier (v0.35):** each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** = +1.5 spreads or more **and** a win rate at or above the Diamond+ average (otherwise A) · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`). The S and D boundary (1.0, 1.25 or 1.5 spreads) is still being chosen by the owner, calibrated in Phase 2 against the owner's gut ranking of 10 ADCs.
 
 **Other lists:**
-- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. For each champion the owner isn't a Main on, the app calculates its Pick Score at a target mastery: Never played and Below average as if Good; Average and Good one level up. It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Good"). There are two kinds of advice:
+- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at a target mastery: Never played and Below average as if Good; Average and Good one level up. It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Good"). There are two kinds of advice:
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
-- **Ban suggestions** (any role, separate from picks), by data only (needs the same 1,000 real games and 1% pick rate, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat.
-- **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label, and in the Growth advisor if they would beat one of the owner's top 3 picks.
+- **Ban suggestions** (any role, separate from picks), by data only (needs the same 1,000 real games and the same pick-rate bar, 0.8%, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat. Any role, and each champion's main role is shown.
+- **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label, and in the **Needs a card** list: champions that pass the filters but have no card, sorted by Meta Score. They are not in the Growth advisor (v0.35).
 
 ### Comfort in detail
 
@@ -252,7 +253,7 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 
 **Decide before or during Phase 2**
 - **Ban list check:** the owner's bans in the last 3 months were Tristana, and they'd also ban Yunara or Jinx. Does the Ban threat ranking put them near the top? (Bans go by data, not by these examples.)
-- Are the tier cutoffs and the stats floor right? Calibrate in Phase 2.
+- **Tier boundaries:** choose the S and D boundary (1.0, 1.25 or 1.5 spreads; A/B and B/C stay at ±0.5) and check the stats floor. Calibrate in Phase 2.
 - Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
 - **Are Pick Scores spread enough?** Comfort for the owner's pool sits mostly between 86 and 100, so Stats should do most of the separating. Check with real data and widen the gaps if the tiers feel too similar.
 - Review all cards' traits with the "at least Low" rule (only Lucian is done so far), and fill in mastery and difficulty for any remaining draft cards.
@@ -271,18 +272,18 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - Run: `python3 -m scoring --data-dir DATA --report` (tables) or `python3 -m scoring --self-check` (every card's Comfort against the brief; all 32 match within 0.04).
 - After every collector save, `collector/main.py` runs it as a separate process and writes `scores/latest.json` and `scores/<patch>.json` into the `data` branch. A scoring failure is logged and never stops the data from being saved.
 - Choices the brief doesn't spell out (the owner can change any of them):
-  - **Pick rate** means the share of all games the champion appears in (`PICK_RATE_BASIS = "games"`). The other reading, share of all bot-lane picks (`"lane"`), is half as big and drops Hwei, Lux, Ziggs, Syndra, Xerath and Veigar from the ranking.
+  - **Pick rate** = the champion's bot-lane games ÷ all games (`PICK_RATE_BASIS = "games"`), with all games estimated as Diamond+ participants ÷ 10 (see the recipe). The other reading, share of all bot-lane picks (`"lane"`), is half as big and drops Hwei, Lux, Ziggs, Syndra, Xerath and Veigar from the ranking.
   - **Blend:** "this patch's games" = the champion's real games in the lane this patch. Win rate is compared with each patch's own Diamond+ average, then blended; pick rate and lane share are blended too. A champion with no games last patch is 100% this patch.
   - **OTP:** the 55% / 50-game rule uses all roles; the OTP win rate and OTP games are the player's bot-lane games on that champion, compared with the champion's bot-lane win rate over the same two patches (unweighted, because player files have no server split). Champions with no OTP games get a neutral 50.
   - **Trait average:** the average over the eligible champions that have a card (fallback: all cards when fewer than 10).
-  - **Tiers** use the Pick Score rounded to 1 decimal.
-  - **Growth advisor for champions without a card:** no Comfort exists, so it is estimated as the average Comfort of all cards at Good mastery and flagged "estimate".
+  - **Tiers** use spreads rounded to 2 decimals; one spread is the population standard deviation of the Pick Scores of the champions with a card. Tier at target in the Growth advisor is read against the patch's current average and spread.
   - **Pool exclusion:** Yasuo and Katarina (melee, "stay out of my bot-lane pool") are left out of every ranking (`EXCLUDED_FROM_POOL`) and listed separately.
 
 ## Model versions
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.35** (Oct 11, 2026): weights Stats 42.5% / Comfort 52.5% / OTP 5%. Pick rate defined as the champion's bot-lane games ÷ all games (same numbers as before); pick-rate filter lowered from 1% to 0.8%. Tiers by spreads from the patch's average Pick Score (S +1.5 and win rate at or above average, A +0.5, B −0.5, C −1.5); stats floor kept; boundaries in config. Growth advisor only for champions with a card; new "Needs a card" list. Ban threat shows each champion's role. Yasuo and Katarina stay excluded.
 - **v0.34** (Oct 11, 2026): the 1,000-game filter counts this patch and last patch together, so the tier list stays full early in a patch (lane share and pick rate use the same blended numbers; the data-freshness label shows how much is this patch). Meta Score defined = Stats points alone. Build recommendations dropped from the goals (maybe later). Roles built in order bot lane → support → jungle.
 - **v0.33** (Oct 3, 2026): PBI removed, so Stats = 75% win rate points + 25% pick rate. Bans by data only: Ban threat = (win rate − Diamond+ average) × pick rate. Growth advisor rule (Never played and Below average → as if Good; Average and Good → one level up; shown if it beats the #3 pick). The final site covers bot lane, jungle and support.
 - **v0.32** (Oct 3, 2026): patch blending, where share of this patch = this patch's games ÷ (this patch's games + 1,000) and the rest comes from last patch, with a data-freshness label per champion. Season totals for OTPs stored (current and previous season).

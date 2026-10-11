@@ -1,4 +1,4 @@
-"""The scoring model, step by step as in the brief (v0.34).
+"""The scoring model, step by step as in the brief (v0.35).
 
 Reads the files the collector saves (see the README on the `data` branch) and returns
 one dictionary with everything the website will need.
@@ -8,6 +8,7 @@ import gzip
 import json
 import os
 import re
+import statistics
 from datetime import datetime, timezone
 
 from . import comfort as comfort_module
@@ -87,13 +88,21 @@ def percentile_points(values):
     return points
 
 
-def tier_of(score, win_rate_delta=None):
-    """Tier from the Pick Score (rounded to 1 decimal, as the brief writes the cutoffs),
-    then the stats floor: a win rate 1.5% or more below the average caps it at B."""
-    rounded = round(score, 1)
+def spreads_from_average(score, mean, sd):
+    """How many standard deviations ("spreads") the score is above the patch average
+    (rounded to 2 decimals, as shown). No spread at all in the scores: everyone is 0."""
+    return 0.0 if not sd else round((score - mean) / sd, 2)
+
+
+def tier_of(spreads, win_rate_delta=None, boundaries=None):
+    """Tier from the spreads, then S needs a win rate at or above the Diamond+ average
+    (otherwise A), then the stats floor: a win rate 1.5% or more below the average caps it at B.
+    `boundaries` is a list like config.TIER_BOUNDARIES (the comparison table tries others)."""
     tier = "D"
-    for name, cutoff in config.TIER_CUTOFFS:
-        if rounded >= cutoff:
+    for name, lowest in (boundaries or config.TIER_BOUNDARIES):
+        if spreads >= lowest:
+            if name == "S" and win_rate_delta is not None and win_rate_delta < config.S_MIN_WIN_RATE_DELTA:
+                continue
             tier = name
             break
     capped = False
@@ -101,6 +110,22 @@ def tier_of(score, win_rate_delta=None):
         if config.TIER_RANK[tier] < config.TIER_RANK[config.STATS_FLOOR_TIER]:
             tier, capped = config.STATS_FLOOR_TIER, True
     return tier, capped
+
+
+def old_fixed_tier_of(score, win_rate_delta=None):
+    """The v0.34 tiers (fixed Pick Score cutoffs). Only for the comparison table."""
+    tier = "D"
+    for name, cutoff in config.OLD_FIXED_CUTOFFS:
+        if round(score, 1) >= cutoff:
+            tier = name
+            break
+    if win_rate_delta is not None and win_rate_delta <= config.STATS_FLOOR:
+        if config.TIER_RANK[tier] < config.TIER_RANK[config.STATS_FLOOR_TIER]:
+            tier = config.STATS_FLOOR_TIER
+    return tier
+
+
+ROLE_NAMES = {"BOTTOM": "ADC / bot lane", "UTILITY": "Support", "JUNGLE": "Jungle", "MIDDLE": "Mid", "TOP": "Top"}
 
 
 DISPLAY_FIXES = {
@@ -190,7 +215,8 @@ def all_role_numbers(patch, champ):
             best_role, best_games = role, counter[0] + counter[2]
     if not real:
         return None
-    return {"real": real, "win_rate": 100.0 * wins_w / games_w, "weighted": games_w, "main_role": best_role}
+    return {"real": real, "win_rate": 100.0 * wins_w / games_w, "weighted": games_w, "main_role": best_role,
+            "main_role_share": best_games / real}
 
 
 def lane_candidates(current, previous):
@@ -294,8 +320,9 @@ def otp_numbers(root, patches, eligible_ids):
 
 def ban_threats(current, previous):
     """Ban threat = (win rate - Diamond+ average) x pick rate, for champions above the average.
-    Any role. Same blending; pick rate = share of games the champion appears in.
-    Needs the same sample (1,000 real games, 1% pick rate) so thin samples can't top the list."""
+    Any role; each row says which role the champion mostly plays. Same blending; pick rate =
+    share of games the champion appears in. Needs the same sample (1,000 real games and the
+    pick-rate bar) so thin samples can't top the list."""
     rows = []
     for champ in set(current.champions) | (set(previous.champions) if previous else set()):
         cur = all_role_numbers(current, champ)
@@ -318,6 +345,8 @@ def ban_threats(current, previous):
         rows.append({
             "id": int(champ), "riot_name": name, "name": display_name(name),
             "main_role": (cur or prev)["main_role"],
+            "role": ROLE_NAMES.get((cur or prev)["main_role"], (cur or prev)["main_role"]),
+            "main_role_share": (cur or prev)["main_role_share"],
             "real_games": real,
             "win_rate_delta": delta,
             "pick_rate": pick_rate,
@@ -398,16 +427,24 @@ def score_all(root, cards=None, now=None):
         v["mastery"] = card["mastery"]
         v["pick_score"] = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * v["comfort"]
                            + config.WEIGHT_OTP * v["otp_points"])
-        v["tier"], v["tier_capped_by_floor"] = tier_of(v["pick_score"], v["win_rate_delta"])
 
     pick_list = sorted((v for v in eligible.values() if v["has_card"]), key=lambda v: -v["pick_score"])
+    # Tiers: distance from this patch's average Pick Score, in standard deviations.
+    scores_now = [v["pick_score"] for v in pick_list]
+    tier_stats = {"average_pick_score": statistics.fmean(scores_now) if scores_now else None,
+                  "spread": statistics.pstdev(scores_now) if len(scores_now) > 1 else 0.0,
+                  "champions": len(scores_now),
+                  "boundaries": {name: lowest for name, lowest in config.TIER_BOUNDARIES}}
+    for v in pick_list:
+        v["spreads"] = spreads_from_average(v["pick_score"], tier_stats["average_pick_score"], tier_stats["spread"])
+        v["tier"], v["tier_capped_by_floor"] = tier_of(v["spreads"], v["win_rate_delta"])
     for i, v in enumerate(pick_list, 1):
         v["pick_rank"] = i
     meta_list = sorted(eligible.values(), key=lambda v: -v["meta_score"])
     for i, v in enumerate(meta_list, 1):
         v["meta_rank"] = i
 
-    advisor = growth_advisor(eligible, carded, pick_list, cards, trait_average)
+    advisor = growth_advisor(eligible, carded, pick_list, trait_average, tier_stats)
 
     ban_list = ban_threats(current, previous)
     lane_names = {v["id"] for v in eligible.values()}
@@ -424,7 +461,7 @@ def score_all(root, cards=None, now=None):
         out["data_label"] = "Data: %d%% this patch" % round(100 * v["this_patch_share"])
         if v["has_card"]:
             out.update({k: v[k] for k in ("mastery", "comfort", "comfort_parts", "pick_score", "pick_rank",
-                                          "tier", "tier_capped_by_floor")})
+                                          "spreads", "tier", "tier_capped_by_floor")})
         else:
             out["label"] = "no card yet"
         return out
@@ -439,7 +476,7 @@ def score_all(root, cards=None, now=None):
         if v["lane_share"] is None or v["lane_share"] < config.MIN_LANE_SHARE:
             reasons.append("lane share under %d%%" % round(100 * config.MIN_LANE_SHARE))
         if v["pick_rate"] is None or v["pick_rate"] < config.MIN_PICK_RATE:
-            reasons.append("pick rate under %d%%" % round(100 * config.MIN_PICK_RATE))
+            reasons.append("pick rate under %g%%" % (100 * config.MIN_PICK_RATE))
         if v["real_games"] >= 300:
             why_out[k] = {"name": display_name(v["riot_name"]), "real_games": v["real_games"],
                           "lane_share": v["lane_share"], "pick_rate": v["pick_rate"], "failed": reasons}
@@ -463,7 +500,8 @@ def score_all(root, cards=None, now=None):
         "cards_not_ranked": sorted(cards_not_ranked),
         "pick_score_list": [clean(v) for v in pick_list],
         "meta_score_list": [clean(v) for v in meta_list],
-        "uncarded_champions": [clean(v) for v in meta_list if not v["has_card"]],
+        "needs_a_card": [clean(v) for v in meta_list if not v["has_card"]],
+        "tier_stats": tier_stats,
         "excluded_by_pool_rule": excluded,
         "ban_threat_list": ban_list,
         "growth_advisor": advisor,
@@ -474,49 +512,40 @@ def score_all(root, cards=None, now=None):
 # ---------------------------------------------------------------- Growth advisor
 
 
-def growth_advisor(eligible, carded, pick_list, cards, trait_average):
+def growth_advisor(eligible, carded, pick_list, trait_average, tier_stats):
     """Suggest champions that would beat the owner's current #3 pick at a target mastery.
 
-    Never played and Below average are scored as if Good; Average and Good one level up.
-    Champions without a card have no Comfort, so their Comfort is estimated as the average
-    Comfort of all cards at Good mastery; they are flagged as estimates.
+    Only champions with a card (Comfort needs one). Never played and Below average are scored
+    as if Good; Average and Good one level up. The tier at the target is read against the
+    patch's current average and spread.
     """
     if len(pick_list) < config.GROWTH_BEAT_RANK:
         return []
     bar = pick_list[config.GROWTH_BEAT_RANK - 1]["pick_score"]
     scores = {v["id"]: v["pick_score"] for v in pick_list}
-    typical = sum(comfort_module.comfort(c, trait_average, "good")["comfort"] for c in cards) / len(cards)
-
-    def pick_score_with(v, comfort_value):
-        return (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * comfort_value
-                + config.WEIGHT_OTP * v["otp_points"])
 
     suggestions = []
     for k, v in eligible.items():
-        if v["has_card"]:
-            current_mastery = v["mastery"]
-            if current_mastery == "main":
-                continue
-            target = config.GROWTH_TARGET[current_mastery]
-            new_comfort = comfort_module.comfort(carded[k], trait_average, target)["comfort"]
-            before = v["pick_score"]
-            kind = "New champion" if current_mastery == "never_played" else "Upgrade"
-            estimate = False
-        else:
-            target, new_comfort, before, kind, estimate = "good", typical, None, "New champion", True
-            current_mastery = None
-        after = pick_score_with(v, new_comfort)
-        if after <= bar or (before is not None and after <= before):
+        if not v["has_card"] or v["mastery"] == "main":
+            continue
+        current_mastery = v["mastery"]
+        target = config.GROWTH_TARGET[current_mastery]
+        new_comfort = comfort_module.comfort(carded[k], trait_average, target)["comfort"]
+        before = v["pick_score"]
+        kind = "New champion" if current_mastery == "never_played" else "Upgrade"
+        after = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * new_comfort
+                 + config.WEIGHT_OTP * v["otp_points"])
+        if after <= bar or after <= before:
             continue
         others = [s for cid, s in scores.items() if cid != v["id"]]
         rank = 1 + sum(1 for s in others if s > after)
-        tier, _ = tier_of(after, v["win_rate_delta"])
+        tier, _ = tier_of(spreads_from_average(after, tier_stats["average_pick_score"], tier_stats["spread"]),
+                          v["win_rate_delta"])
         suggestions.append({
             "id": v["id"], "name": v["name"], "kind": kind,
             "current_mastery": current_mastery, "target_mastery": target,
-            "pick_score_now": before, "pick_score_at_target": after, "gain": None if before is None else after - before,
+            "pick_score_now": before, "pick_score_at_target": after, "gain": after - before,
             "would_rank": rank, "tier_at_target": tier,
-            "estimate_no_card": estimate,
         })
     suggestions.sort(key=lambda s: -s["pick_score_at_target"])
     return suggestions
