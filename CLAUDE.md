@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.40**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.41**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -53,7 +53,7 @@ The final site covers 3 roles: bot lane (ADC and APC), support and jungle, built
 - Code: `collector/` (Python standard library only). Settings, including `PRIORITY_SHARE`, double-weight servers, recheck timing and patches kept, are in `collector/config.py`.
 - Schedule: `.github/workflows/collect.yml` runs every 6 hours, about 5 hours of work per run, and never two runs at once. "Run workflow" on the Actions page takes a time limit and a per-region game limit for tests. It saves a checkpoint every hour.
 - What it does: it loads each server's Diamond+ list and checks players for new queue 420 games. Active players are rechecked after 5 hours; inactive ones after 24 hours, then doubling up to 14 days (lookback stays 10 days). Each new game is downloaded once, and only Diamond+ participants are counted. Within each routing region, the priority servers get `PRIORITY_SHARE` (70%) of requests: Americas LAN and NA, Europe EUW, Asia KR. SEA is split evenly.
-- Data lives on the `data` branch, replaced each save with no history (fetch it with `git fetch origin +data:refs/remotes/origin/data`). `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as scrambled codes.
+- Data lives on the `data` branch, replaced each save with no history (fetch it with `git fetch origin +data:refs/remotes/origin/data`). `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as secret-key codes (v0.41).
 - **Roles with full detail:** bot lane (`BOTTOM`), support (`UTILITY`) and jungle (`JUNGLE`, from Oct 3, 2026), set in `config.DETAIL_ROLES`. Each has a per-patch file (`bottom`, `utility`, `jungle`.json.gz) with games, final items, rune pages, and allies/enemies per champion. Jungle costs no extra Riot requests, since every downloaded game already has all 10 players. Nothing is built on jungle data until the bot-lane tier list is done, and the role order is bot lane, then support, then jungle.
 - Champions are stored by Riot's champion ID. The `name` field is Riot's internal name (`Kaisa`, `MissFortune`, `KogMaw`); the website must take display names from Data Dragon.
 - **Player files (for the OTP rule).** Players appear only as scrambled codes. Counters are `[games, wins]`; a key `"ID"` means all roles, `"ID:B"` bot-lane games, `"ID:S"` support games and `"ID:J"` jungle games (from Oct 3, 2026).
@@ -292,13 +292,26 @@ Pasted from the owner; the live brief has the full details.
 - **Riot developer rules plan approved** (Part B below).
 - **Phase 3 note:** the draft helper must always offer several choices with reasons, never one forced pick (Riot rule: apps can't dictate player decisions).
 
+## Brief changes v0.41 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Player codes get a secret key (salt)**, stored as the GitHub secret `PLAYER_CODE_SALT`. Existing codes were **converted, not dropped**, so season OTP totals since Oct 2 are kept. New code = `HMAC-SHA256(secret, old code)` shortened to 16 characters; for a new player the collector makes the old code first, then the HMAC (`scramble` in `collector/store.py`).
+- The history of the public `data` and `data-backup` branches was reset after a private backup, so old unsalted codes are no longer on any branch. Game IDs in `state/` stay (not personal data).
+- Riot policy dates: general policy **May 29, 2025**; League game policy **Aug 21, 2026** (https://developer.riotgames.com/policies/game-specific). The product is already registered in the Developer Portal; the owner updates its description.
+- Done Oct 11 (the conversion): backup of both branches kept outside the repo; before/after comparison identical (players, season games and wins per champion, OTP players and games, every Pick Score); the 42 Actions logs checked, no codes or player IDs in them.
+- **Rules now in the code:** the collector refuses to start without `PLAYER_CODE_SALT` (at least 32 characters), and refuses saved data made with another secret or not converted (`codes.json` in the data holds a format version and a short fingerprint of the secret). A wrong secret would otherwise orphan every player and lose the OTP totals. **Never change or lose the secret**; keep a copy in the password manager. Running the collector by hand needs `PLAYER_CODE_SALT` in the environment; the tests use a made-up one.
+- One-time converter: `python3 -m collector.convert_codes DATA_DIR` (refuses to run twice). Tests: `tests/test_player_codes.py`.
+- Known limit: GitHub still serves the old (replaced) commits to anyone who knows their exact ID; only GitHub Support can erase them. The old codes were unsalted hashes, so this is a small leak, but it is why the secret matters from now on.
+- Small fix: the "near misses" list breaks ties by name (it flipped order between runs on the same data). Display only.
+
 ### Riot developer rules (checked Oct 11, 2026)
 
 - Riot policy pages re-read on Oct 11, 2026. `developer.riotgames.com/policies/general`: **LAST UPDATED: MAY 29, 2025**. `developer.riotgames.com/docs/lol` (Developer API Policy and Game Policy sections): the page shows **no "last updated" date** (only "© 2021 Riot Games, Inc." and a Nov 20, 2023 note about Riot IDs).
 - Nothing changed from the rules we planned around: legal notice required; product must be registered with an up-to-date description; key never in code; HTTPS only; no data broker; no identifying hidden players; no apps that dictate player decisions. (Also noted: Riot logos only from the Press Kit and only when unavoidable; free tier required; no MMR/ELO alternatives to the official ranking.)
 - **Legal notice (footer, visible under all 4 tabs, outside `#content` so it shows while loading):** Riot's exact League wording from the docs/lol page with "LoL Pick Lab" as the product name: "LoL Pick Lab is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc." Below it, a small about line: free personal project for me and friends, no ads, no payments, no data sold; stats are combined from many Diamond+ ranked games and never show individual players.
 - Tests: `tests/test_site.py` (`LegalNoticeTests`: notice present with the exact wording, never inside one tab or a hidden element) and `tests/test_safety.py` (fails on any `RGAPI-` key-shaped text in the project files or in the main branch history).
-- **Safety audit, Oct 11 (report only; nothing was deleted or rewritten):** no key or key-shaped text in the code, any git branch's history, the unpacked `data` and `data-backup` files, the site files or the 42 GitHub Actions logs. Every Riot call is HTTPS (`collector/riot.py`), the key travels in the `X-Riot-Token` header and comes only from the `RIOT_API_KEY` secret. The site has no images and no Riot logos. Open finding: player codes are an unsalted truncated SHA-256 of the PUUID (`scramble` in `collector/store.py`), so anyone who knows a player's PUUID could look that player up in the public `data` branch. Fix proposal waits for the owner's decision (see open questions).
+- **Safety audit, Oct 11 (report only; nothing was deleted or rewritten):** no key or key-shaped text in the code, any git branch's history, the unpacked `data` and `data-backup` files, the site files or the 42 GitHub Actions logs. Every Riot call is HTTPS (`collector/riot.py`), the key travels in the `X-Riot-Token` header and comes only from the `RIOT_API_KEY` secret. The site has no images and no Riot logos. Open finding: player codes were an unsalted truncated SHA-256 of the PUUID, so anyone who knew a player's PUUID could look that player up in the public `data` branch. Fixed in v0.41 with a secret key (see "Brief changes v0.41").
 
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
 
@@ -350,7 +363,7 @@ Pasted from the owner; the live brief has the full details.
   - [x] Slice 1: basic tier table (Oct 11)
   - [x] Slice 2: mastery shown as 1–5 colored dots under Comfort, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
   - [x] Slice 3: tabs Tier list · Meta · Comfort · Growth, Meta Score with Needs a card, Comfort breakdown, Growth advisor with "skill pays off", "too few games" below 20 OTP games (Oct 11, v0.37). Ban suggestions removed from this phase.
-- [ ] Follow Riot's developer rules (v0.40: policies re-read Oct 11, 2026, no change; legal notice + about line footer done; safety audit done, salting decision open; **still to do: register the product in the Developer Portal**): legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
+- [ ] Follow Riot's developer rules (v0.40: policies re-read Oct 11, 2026, no change; legal notice + about line footer done; safety audit done, salting done in v0.41; product already registered in the Developer Portal, the owner updates its description): legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
 - [ ] Publish on Vercel and share the link with one friend
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
@@ -380,7 +393,7 @@ Pasted from the owner; the live brief has the full details.
 - **Calibration list** (the owner's opinion, written Oct 3 before any data): the strongest bot-lane champions this meta, unordered: Jinx, Hwei, Lux, Tristana, Xayah, Caitlyn, Viktor, Ziggs, Twitch, Yunara, Zeri, Ashe, Draven. Test in Phase 2: do they land at the top of the Meta Score (data only)?
 - **Cards per role (Phase 2 design note from the owner):** store champion cards per champion + role, with the same card structure, but each role has its own types, trait list and priorities. A champion can have a bot-lane card and a support card.
 
-- **Player codes (decision needed, Oct 11 audit):** codes are an unsalted SHA-256 of the PUUID. Option: add a secret salt (GitHub secret) so codes can't be matched to a known PUUID; all stored player files would need to be rebuilt or dropped once. Also: match IDs sit in `state/` on the public `data` branch (the website doesn't need them; the collector does, to avoid double downloads).
+- **Player codes (decided v0.41, done Oct 11):** salted with the secret `PLAYER_CODE_SALT`, old codes converted, branch history reset. Game IDs in `state/` stay. Still open: the old commits remain fetchable by exact ID on GitHub (see v0.41).
 - **Collector health:** no email alerts (decided Oct 11). Check the collector by eye when the site looks stale; the page shows a "Last updated" time and warns when it is old.
 - **Sample-size limits:** recheck the Low / Medium / High limits (changed in v0.39 to under 10,000 / 10,000 / 30,000 real games) after a few patches.
 
@@ -405,6 +418,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.41** (Oct 11, 2026): no score change. Player codes get a secret key (`PLAYER_CODE_SALT`); old codes converted without losing data; `data` and `data-backup` history reset; Riot policy dates logged (general May 29, 2025; League game policy Aug 21, 2026).
 - **v0.40** (Oct 11, 2026): no score change. Growth tab gets the third table "Utopy picks" (long-term goals, information only). Riot developer rules plan: legal notice and about line footer on all tabs, key-scan and legal-notice tests, safety audit.
 - **v0.39** (Oct 11, 2026): no score change. Growth advisor uses the next mastery level only (both lists); "Could reach A or S" becomes "Next step to A or S" with a "closest" line when empty; ceiling at Main kept as information only; sample-size labels Low under 10,000, Medium 10,000–29,999, High 30,000+.
 - **v0.38** (Oct 11, 2026): no score change. Growth advisor split into Top upgrades and Could reach A or S (Main mastery lands in A or S); skill pays off shown compact; ban code removed.

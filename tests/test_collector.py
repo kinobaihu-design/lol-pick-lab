@@ -9,6 +9,9 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# A made-up secret for tests only (the real one is a GitHub secret and is never in the project).
+os.environ.setdefault("PLAYER_CODE_SALT", "test-only-secret-" + "0123456789abcdef" * 2)
+
 from collector import config  # noqa: E402
 from collector.riot import Limiter, parse_limits  # noqa: E402
 from collector.store import DataDamaged, Store, compact_match, scramble  # noqa: E402

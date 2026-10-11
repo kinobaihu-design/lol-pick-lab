@@ -18,7 +18,8 @@ from datetime import datetime, timezone
 
 from . import config
 from .riot import KeyRejected, NotFound, RequestFailed, RiotClient
-from .store import DataDamaged, Store, compact_match, scramble, win_rate
+from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret,
+                    scramble, win_rate)
 
 APEX_TIERS = ("challengerleagues", "grandmasterleagues", "masterleagues")
 DIAMOND_DIVISIONS = ("I", "II", "III", "IV")
@@ -414,12 +415,24 @@ def main():
         sys.exit(1)
 
     try:
+        player_secret()
+    except MissingSecret as error:
+        log("STOPPING: %s. Add it as a GitHub secret; player codes can't be made without it." % error)
+        sys.exit(1)
+
+    try:
         store = Store.load(args.data_dir)
+    except CodesMismatch as error:
+        log("STOPPING: %s. Nothing was changed." % error)
+        sys.exit(1)
     except DataDamaged as error:
         log("Saved data is damaged (%s). Using the backup copy." % error)
         args.previous = ""  # don't overwrite the good backup with damaged data
         try:
             store = Store.load(args.backup_dir) if args.backup_dir else Store()
+        except CodesMismatch as error:
+            log("STOPPING: backup copy: %s. Nothing was changed." % error)
+            sys.exit(1)
         except DataDamaged as error:
             log("Backup is damaged too (%s). Starting fresh." % error)
             store = Store()

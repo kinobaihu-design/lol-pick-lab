@@ -8,6 +8,7 @@ Weighted games = 2 * c[0] + c[2], weighted wins = 2 * c[1] + c[3].
 
 import gzip
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -25,9 +26,48 @@ class DataDamaged(Exception):
     """A saved file could not be read."""
 
 
-def scramble(puuid):
-    """Turn a Riot player ID into a short code that can't be looked up."""
+SECRET_ENV = "PLAYER_CODE_SALT"
+CODES_FILE = "codes.json"
+CODES_VERSION = "hmac-sha256-v1"
+MIN_SECRET_LENGTH = 32
+
+
+class MissingSecret(Exception):
+    """The secret key for player codes is not set (or too short)."""
+
+
+class CodesMismatch(Exception):
+    """Saved data was made with other player codes than the current secret makes."""
+
+
+def player_secret():
+    secret = os.environ.get(SECRET_ENV, "").strip()
+    if len(secret) < MIN_SECRET_LENGTH:
+        raise MissingSecret("%s is missing or shorter than %d characters" % (SECRET_ENV, MIN_SECRET_LENGTH))
+    return secret
+
+
+def unsalted_code(puuid):
+    """The old, public-lookup-able code. Only the first step of scramble(); never saved."""
     return hashlib.sha256(puuid.encode()).hexdigest()[:16]
+
+
+def salted_code(old_code, secret=None):
+    """Code saved in the data: HMAC-SHA256(secret, old code), shortened to 16 characters.
+    Old saved codes are converted with this same function, so they keep matching."""
+    key = (secret or player_secret()).encode()
+    return hmac.new(key, old_code.encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def scramble(puuid):
+    """Turn a Riot player ID into a short code that can't be looked up without the secret."""
+    return salted_code(unsalted_code(puuid))
+
+
+def secret_check(secret=None):
+    """A short fingerprint of the secret, saved next to the data, to catch a wrong secret."""
+    key = (secret or player_secret()).encode()
+    return hmac.new(key, b"lol-pick-lab codes check", hashlib.sha256).hexdigest()[:12]
 
 
 def patch_from_version(version):
@@ -317,6 +357,7 @@ class Store:
             s: {str(day): sorted(nums) for day, nums in days.items()}
             for s, days in self.processed.items()})
         _write(os.path.join(state, "pending.json.gz"), self.pending)
+        _write(os.path.join(root, CODES_FILE), {"version": CODES_VERSION, "check": secret_check()})
         _write(os.path.join(root, "last_run.json"), run_info)
         with open(os.path.join(root, "README.md"), "w") as f:
             f.write(DATA_README)
@@ -328,6 +369,7 @@ class Store:
         store = cls()
         if not os.path.isdir(os.path.join(root, "state")):
             return store  # nothing saved yet
+        check_codes(root)
         try:
             state = os.path.join(root, "state")
             for server, codes in _read(os.path.join(state, "players.json.gz")).items():
@@ -360,6 +402,17 @@ class Store:
         except Exception as error:
             raise DataDamaged("%s: %s" % (type(error).__name__, error))
         return store
+
+
+def check_codes(root):
+    """Refuse data whose player codes were not made with the current secret."""
+    path = os.path.join(root, CODES_FILE)
+    try:
+        saved = _read(path)
+    except (OSError, ValueError):
+        raise CodesMismatch("%s is missing: the data has not been converted to secret-key codes" % CODES_FILE)
+    if saved.get("version") != CODES_VERSION or saved.get("check") != secret_check():
+        raise CodesMismatch("the data was made with a different player-code secret")
 
 
 def season_of(patch):
@@ -454,6 +507,12 @@ during the season, for the "50 games this season" part of the OTP rule:
   still kept (the last 3 patches).
 Games collected before season totals existed were copied in from the patch
 files (without the bot/support split, which starts from that point).
+
+## Player codes
+A code is `HMAC-SHA256(secret, SHA-256(player ID)[:16])[:16]`. The secret is a
+GitHub secret that is never published, so a code can't be matched to a known
+player ID. `codes.json` holds the format version and a short fingerprint of the
+secret; the collector refuses data made with another secret.
 
 Only Diamond+ players (from Riot's Diamond, Master, Grandmaster and Challenger
 lists for ranked solo/duo) are counted.

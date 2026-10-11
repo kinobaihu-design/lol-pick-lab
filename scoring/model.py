@@ -448,7 +448,7 @@ def score_all(root, cards=None, now=None):
         "utopy_list": utopy,
         "utopy_closest": utopy_closest,
         "growth_advisor": advisor,
-        "near_misses": sorted(why_out.values(), key=lambda row: -row["real_games"])[:15],
+        "near_misses": sorted(why_out.values(), key=lambda row: (-row["real_games"], row["name"]))[:15],
     }
 
 

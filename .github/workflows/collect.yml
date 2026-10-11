@@ -58,6 +58,7 @@ jobs:
       - name: Collect games
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+          PLAYER_CODE_SALT: ${{ secrets.PLAYER_CODE_SALT }}
           PREVIOUS: ${{ steps.load.outputs.previous }}
           MAX_MINUTES: ${{ inputs.max_minutes || '300' }}
           MAX_MATCHES: ${{ inputs.max_matches_per_region || '0' }}
