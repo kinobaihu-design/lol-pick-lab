@@ -463,6 +463,11 @@ Every game/win counter is `[games x2, wins x2, games x1, wins x1]`. The x2 part
 is LAN, NA, EUW and KR, the x1 part is every other server.
 Weighted games = 2 * games x2 + games x1.
 
+## scores/
+Written right after each save by the scoring code (`scoring/` on the `main` branch,
+model v0.34): `latest.json` and `<patch>.json` with the Pick Score list, Meta Score
+list, Ban threat list, Growth advisor suggestions, and champions without a card.
+
 ## state/
 The collector's memory: when each player was last checked, which games were
 already processed (last 14 days), and games waiting to be downloaded.

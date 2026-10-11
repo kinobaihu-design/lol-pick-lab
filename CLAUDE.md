@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.33**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.34**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -27,10 +27,11 @@ One review round per step, so we keep improving without getting stuck:
 A free public website that ranks ADC and support champions each patch using the owner's own rules. Priorities, in order:
 
 1. **Personal tier list** for ADC (support later), from Diamond+ data and the owner's scoring.
-2. **Build recommendations**: items, runes and skill order.
-3. **Draft helper**: enter the draft, get the top 3 picks with reasons.
+2. **Draft helper**: enter the draft, get the top 3 picks with reasons.
 
-The final site covers 3 roles: bot lane (ADC and APC), jungle and support. Nothing is built for jungle or support until the bot-lane (ADC) tier list is done.
+Build recommendations (items, runes, skill order) were dropped from the goals on Oct 11, 2026; they may come back later as an extra (Phase 4). The collector keeps saving items and runes meanwhile.
+
+The final site covers 3 roles: bot lane (ADC and APC), support and jungle, built in that order. Nothing is built for support or jungle until the bot-lane (ADC) tier list is done.
 
 ## How it works (all free)
 
@@ -62,18 +63,19 @@ The final site covers 3 roles: bot lane (ADC and APC), jungle and support. Nothi
   - When a season file is missing, it's rebuilt from the patch files, so nothing is lost. Games from before Oct 2, 2026 (the start of season totals) have no B/S split.
   - Only games we collect are counted, starting Oct 2, 2026, so season totals undercount early on. The OTP reliability formula keeps small OTP samples near neutral.
 - Bans count once per game. Ban rate = games banned ÷ games counted.
-- Skill order isn't collected yet. It's planned for Phase 3, since it needs an extra request per game.
+- Skill order isn't collected yet (the brief says "saved but not used for now"); it would need an extra request per game. Builds were dropped from the goals in v0.34, so it waits for the maybe-later builds extra.
 - Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
-## Scoring model v0.33 (bot lane: ADC and APC): the full recipe
+## Scoring model v0.34 (bot lane: ADC and APC): the full recipe
 
 Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs and share the same trait average. Every part is scored 0–100, then weighted. The order of the steps:
 
-1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 **real** games this patch (counted before the double weight), ≥1% pick rate. The sample-size label (low, medium, high) also uses real games. The double weight (LAN, KR, NA, EUW ×2) still applies to all stats.
+1. **Filters.** A champion needs all four to be ranked: Diamond+ games, ≥10% lane share, ≥1,000 **real** games across this patch and last patch together (counted before the double weight), ≥1% pick rate. Lane share and pick rate use the same blended numbers (see "Patch blending"); the data-freshness label shows how much is this patch. The sample-size label (low, medium, high) also uses real games. The double weight (LAN, KR, NA, EUW ×2) still applies to all stats.
 2. **Stats (40%)** = 75% win rate points + 25% pick rate. Win rate says how strong a champion is; pick rate says it's proven and popular. (PBI was removed in v0.33.)
    - Win rate points = `50 + 12.5 × (win rate − Diamond+ average)`, clamped to 0–100: +4% → 100, +2% → 75, average → 50, −2% → 25, −4% → 0. The Diamond+ average comes from our own data each patch (expected to sit above 50%; Lolalytics shows 52.27%).
    - Pick rate is ranked 0–100 among the eligible bot-lane champions (ADCs and APCs). Ban rate isn't part of the Pick Score.
+   - **Meta Score** = the Stats points alone (the data-only ranking). Every champion that passes the filters gets one, with or without a card.
 3. **Comfort (50%)** comes from the champion cards (see "Comfort in detail"), capped at 100.
 4. **OTP (10%)** = OTP win rate − overall win rate, ranked 0–100 among eligible champions (raw OTP points), then pulled toward 50 by its reliability:
    - `OTP points = 50 + (raw OTP points − 50) × reliability`, where `reliability = OTP games ÷ (OTP games + 300)`. 100 OTP games → 25%; 300 → 50%; 1,000 → 77%; 3,000 → 91%.
@@ -87,7 +89,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
-- **Ban suggestions** (any role, separate from picks), by data only: `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat.
+- **Ban suggestions** (any role, separate from picks), by data only (needs the same 1,000 real games and 1% pick rate, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat.
 - **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label, and in the Growth advisor if they would beat one of the owner's top 3 picks.
 
 ### Comfort in detail
@@ -227,7 +229,7 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - [x] Define the OTP rule (share of recent games on one champion)
 
 **Phase 2, tier list website (first shareable version)**
-- [ ] Claude writes the scoring model as code
+- [x] Claude writes the scoring model as code (`scoring/`, see "Scoring code")
 - [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
 - [ ] Build the bot-lane tier list page: Pick Score, Meta Score, ban suggestions and the Growth advisor, plus games played, a sample-size label (low, medium, high), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score
 - [ ] Follow Riot's developer rules: legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
@@ -235,16 +237,15 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - [ ] Publish on Vercel and share the link with one friend
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
-**Phase 3, builds**
-- [ ] Decide the build rules (win rate vs pick rate, minimum games per build)
-- [ ] Champion page: best core items, boots, runes, skill order
-
-**Phase 4, draft helper**
+**Phase 3, draft helper**
 - [ ] Add matchup and synergy data from the collected matches
 - [ ] Draft screen: enter allies and enemies, get the top 3 picks with reasons, using champion traits (CC vs divers, sustain vs poke)
 
-**Phase 5, later**
+**Phase 4, later**
+- [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
 - [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
+- [ ] Make cards for new bot-lane champions that pass the filters (Seraphine, Aurelion Sol, Karthus, Veigar, plus any the first results show)
+- [ ] Get an email from GitHub when a collector run fails
 - [ ] Apply for a production key if the site grows beyond friends
 
 ## Open questions & improvements
@@ -264,10 +265,25 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - Review the types, type strengths, traits, priorities and levels together, and check that the rules still fit.
 - Range: decide champion by champion which modifiers last "most of the game" when finishing the remaining cards.
 
+## Scoring code (Phase 2, built Oct 11, 2026)
+
+- Code: `scoring/` (Python standard library only). Settings, every number of the recipe, in `scoring/config.py`; the 32 champion cards, with the brief's Comfort printed next to each, in `scoring/cards.json`; Comfort in `scoring/comfort.py`; filters, blending, Stats, OTP, Pick Score, tiers, Ban threat and Growth advisor in `scoring/model.py`.
+- Run: `python3 -m scoring --data-dir DATA --report` (tables) or `python3 -m scoring --self-check` (every card's Comfort against the brief; all 32 match within 0.04).
+- After every collector save, `collector/main.py` runs it as a separate process and writes `scores/latest.json` and `scores/<patch>.json` into the `data` branch. A scoring failure is logged and never stops the data from being saved.
+- Choices the brief doesn't spell out (the owner can change any of them):
+  - **Pick rate** means the share of all games the champion appears in (`PICK_RATE_BASIS = "games"`). The other reading, share of all bot-lane picks (`"lane"`), is half as big and drops Hwei, Lux, Ziggs, Syndra, Xerath and Veigar from the ranking.
+  - **Blend:** "this patch's games" = the champion's real games in the lane this patch. Win rate is compared with each patch's own Diamond+ average, then blended; pick rate and lane share are blended too. A champion with no games last patch is 100% this patch.
+  - **OTP:** the 55% / 50-game rule uses all roles; the OTP win rate and OTP games are the player's bot-lane games on that champion, compared with the champion's bot-lane win rate over the same two patches (unweighted, because player files have no server split). Champions with no OTP games get a neutral 50.
+  - **Trait average:** the average over the eligible champions that have a card (fallback: all cards when fewer than 10).
+  - **Tiers** use the Pick Score rounded to 1 decimal.
+  - **Growth advisor for champions without a card:** no Comfort exists, so it is estimated as the average Comfort of all cards at Good mastery and flagged "estimate".
+  - **Pool exclusion:** Yasuo and Katarina (melee, "stay out of my bot-lane pool") are left out of every ranking (`EXCLUDED_FROM_POOL`) and listed separately.
+
 ## Model versions
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.34** (Oct 11, 2026): the 1,000-game filter counts this patch and last patch together, so the tier list stays full early in a patch (lane share and pick rate use the same blended numbers; the data-freshness label shows how much is this patch). Meta Score defined = Stats points alone. Build recommendations dropped from the goals (maybe later). Roles built in order bot lane → support → jungle.
 - **v0.33** (Oct 3, 2026): PBI removed, so Stats = 75% win rate points + 25% pick rate. Bans by data only: Ban threat = (win rate − Diamond+ average) × pick rate. Growth advisor rule (Never played and Below average → as if Good; Average and Good → one level up; shown if it beats the #3 pick). The final site covers bot lane, jungle and support.
 - **v0.32** (Oct 3, 2026): patch blending, where share of this patch = this patch's games ÷ (this patch's games + 1,000) and the rest comes from last patch, with a data-freshness label per champion. Season totals for OTPs stored (current and previous season).
 - **v0.31** (Oct 3, 2026): Team utility means general usefulness to the team. Trait average and Stats ranks use all eligible bot-lane champions (ADCs and APCs).

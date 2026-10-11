@@ -22,6 +22,7 @@ from .store import DataDamaged, Store, compact_match, scramble, win_rate
 
 APEX_TIERS = ("challengerleagues", "grandmasterleagues", "masterleagues")
 DIAMOND_DIVISIONS = ("I", "II", "III", "IV")
+SCORING_TIMEOUT_SECONDS = 900
 BOT_NAME = "github-actions[bot]"
 BOT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -308,10 +309,26 @@ class Run:
                         del state[code]  # no longer Diamond+
             info = self.run_info(final)
             self.store.save(self.args.data_dir, info)
+            self.score()
         log("Saved data (%s)" % ("final" if final else "checkpoint"))
         if self.args.push:
             self.push(final)
         return info
+
+    def score(self):
+        """Recalculate the scores from the data just saved (writes `scores/` next to it).
+        Runs as its own process and may fail without stopping the collector or the upload."""
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "scoring", "--data-dir", os.path.abspath(self.args.data_dir)],
+                cwd=repo, capture_output=True, text=True, timeout=SCORING_TIMEOUT_SECONDS)
+            if result.returncode == 0:
+                log(result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "Scores updated")
+            else:
+                log("Scoring failed (data is still saved): %s" % (result.stderr or "").strip()[-300:])
+        except (OSError, subprocess.SubprocessError) as error:
+            log("Scoring failed (data is still saved): %s" % error)
 
     def push(self, final):
         """Replace the `data` branch with one fresh commit. The first save of a run
