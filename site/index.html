@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoL Pick Lab: Bot Lane Tier List</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Bot lane tier list</h1>
+    <dl class="facts">
+      <div><dt>Patch</dt><dd id="patch">&hellip;</dd></div>
+      <div><dt>Last updated</dt><dd id="updated">&hellip;</dd></div>
+      <div><dt>Diamond+ average win rate</dt><dd id="average">&hellip;</dd></div>
+      <div><dt>Champions ranked</dt><dd id="count">&hellip;</dd></div>
+    </dl>
+  </header>
+  <div id="notices"><p id="notice" class="notice"></p></div>
+  <p id="loading" class="notice">Loading the scores&hellip;</p>
+  <div id="content" hidden>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="num" title="Place in the list, by Pick Score">#</th>
+            <th>Champion</th>
+            <th>Tier</th>
+            <th class="num" title="The main number: 42.5% Stats, 52.5% Comfort, 5% OTP">Pick Score</th>
+            <th class="num" title="How much you like and play the champion (from your card)">Comfort</th>
+            <th class="num" title="Win rate and pick rate points from Diamond+ games">Stats</th>
+            <th class="num" title="How well one-trick players do on it, pulled toward 50 when there are few">OTP</th>
+            <th class="num" title="Diamond+ win rate, blended with last patch early in a patch">Win rate</th>
+            <th class="num" title="Difference from the Diamond+ average win rate">vs average</th>
+            <th class="num" title="Real games counted, this patch and last patch together">Games</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="foot">* = held down to B by the stats floor. Games = Diamond+ games on this champion in bot lane, this patch and last patch together.</p>
+  </div>
+</main>
+<script src="settings.js"></script>
+<script src="format.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

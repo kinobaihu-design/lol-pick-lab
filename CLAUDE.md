@@ -232,6 +232,22 @@ Pasted from the owner; the live brief has the full details.
 - Trait average is now 13.9 (39 cards). Kit adjustments recalculated for every card; the Comfort numbers in `cards.json` now come from the live brief (e.g. Sivir 98.7, Seraphine 89.0).
 - Rule: types and trait levels are the owner's opinion; only numbers (ranges, Riot difficulty, item stats) get fact-checked.
 
+## Brief changes v0.35, second block (no model change), Oct 11, 2026
+
+- Removed the board item "Get an email from GitHub when a collector run fails" (no email alerts). Added to open questions: check collector health by eye when the site looks stale.
+- Tier list page item updated: Comfort shown next to the Pick Score (Pick Score stays the main number); sample-size label by real games (this patch + last patch together): Low 1,000–2,999, Medium 3,000–9,999, High 10,000+, kept as one setting in the code (`SAMPLE_SIZE_LIMITS` in `site/settings.js`); PC first, phone only needs to be readable; English only; built in 3 slices.
+- Open question added: recheck the sample-size limits after a few patches.
+- Growth advisor: the Oct 11 test works as intended; keep as is.
+
+## Tier list page (`site/`, Phase 2, slice 1 built Oct 11, 2026)
+
+- Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
+- It reads only the finished scores file the collector writes (`scores/latest.json` on the `data` branch, fetched from `raw.githubusercontent.com`). It never calls the Riot API and never contains a key; a test scans `site/` for key names and Riot addresses.
+- If the live file can't be reached it shows `site/data/latest.json` (a saved copy) with a visible notice. This copy is only a fallback and goes stale; refresh it by copying a new `scores/latest.json` over it.
+- Slice 1 shows: patch, "Last updated" (the file's `generated` time, with a red warning when older than 13 hours), then one table sorted by Pick Score: rank, champion, tier (own color, `*` = held to B by the stats floor), Pick Score, Comfort, Stats, OTP points, win rate, difference from the Diamond+ average, games (real games, this patch + last patch).
+- Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
+- Not deployed. Check before pushing to `main` whether Vercel would publish it (no `vercel.json` yet).
+
 ## Project board
 
 **Phase 0, setup:** all done.
@@ -246,7 +262,10 @@ Pasted from the owner; the live brief has the full details.
 **Phase 2, tier list website (first shareable version)**
 - [x] Claude writes the scoring model as code (`scoring/`, see "Scoring code")
 - [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
-- [ ] Build the bot-lane tier list page: Pick Score, Meta Score, ban suggestions and the Growth advisor, plus games played, a sample-size label (low, medium, high), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score
+- [ ] Build the bot-lane tier list page in 3 slices (`site/`): Pick Score with Comfort next to it (Pick Score stays the main number), Meta Score, ban suggestions and the Growth advisor, plus games played, a sample-size label by real games (this patch + last patch together: Low 1,000–2,999, Medium 3,000–9,999, High 10,000+; one setting in the code so it can be retuned), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score. PC first (phone only needs to be readable), English only.
+  - [x] Slice 1: basic tier table (Oct 11)
+  - [ ] Slice 2: sample-size label, data-freshness label, OTP counts, trait badges, Meta Score
+  - [ ] Slice 3: ban suggestions, Growth advisor, Needs a card, "Carded but not ranked"
 - [ ] Follow Riot's developer rules: legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
 - [ ] Publish on Vercel and share the link with one friend
@@ -260,7 +279,6 @@ Pasted from the owner; the live brief has the full details.
 - [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
 - [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
 - [x] Make cards for new bot-lane champions that pass the filters (Aurelion Sol, Karthus, Swain, Veigar, Vladimir, Seraphine, Mel; done Oct 11; more if the "Needs a card" list grows)
-- [ ] Get an email from GitHub when a collector run fails
 - [ ] Apply for a production key if the site grows beyond friends
 
 ## Open questions & improvements
@@ -274,6 +292,9 @@ Pasted from the owner; the live brief has the full details.
 - Flexibility bonus (beta, Varus only): check in Phase 2 whether it's worth keeping or extending.
 - **Calibration list** (the owner's opinion, written Oct 3 before any data): the strongest bot-lane champions this meta, unordered: Jinx, Hwei, Lux, Tristana, Xayah, Caitlyn, Viktor, Ziggs, Twitch, Yunara, Zeri, Ashe, Draven. Test in Phase 2: do they land at the top of the Meta Score (data only)?
 - **Cards per role (Phase 2 design note from the owner):** store champion cards per champion + role, with the same card structure, but each role has its own types, trait list and priorities. A champion can have a bot-lane card and a support card.
+
+- **Collector health:** no email alerts (decided Oct 11). Check the collector by eye when the site looks stale; the page shows a "Last updated" time and warns when it is old.
+- **Sample-size limits:** recheck the Low / Medium / High limits (1,000 / 3,000 / 10,000 real games) after a few patches.
 
 **Review once all ADC cards are done**
 - Review the types, type strengths, traits, priorities and levels together, and check that the rules still fit.
