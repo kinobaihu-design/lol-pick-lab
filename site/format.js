@@ -63,6 +63,11 @@
     return MASTERY_NAMES[key] || "";
   }
 
+  // 1 (Never played) to 5 (Main); 0 when unknown.
+  function masteryLevel(key) {
+    return MASTERY_ORDER.indexOf(key) + 1;
+  }
+
   // The traits that exist on the card, in the owner's priority order, with their level.
   function traitList(traits) {
     var out = [];
@@ -151,7 +156,7 @@
 
   var api = { number: number, signed: signed, games: games, ageHours: ageHours, isStale: isStale,
               describeAge: describeAge, ranked: ranked, tierText: tierText, looksLikeScores: looksLikeScores,
-              masteryText: masteryText, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
+              masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
               sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

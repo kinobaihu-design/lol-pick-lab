@@ -75,6 +75,8 @@ test("mastery names and trait badges", () => {
   assert.strictEqual(F.masteryText("below_average"), "Below average");
   assert.strictEqual(F.masteryText("never_played"), "Never played");
   assert.strictEqual(F.masteryText("nope"), "");
+  assert.deepStrictEqual(["never_played", "below_average", "average", "good", "main"].map(F.masteryLevel), [1, 2, 3, 4, 5]);
+  assert.strictEqual(F.masteryLevel("nope"), 0);
   const list = F.traitList({ vision: "low", wave_clear: "high", cc: "mid", poke: "mid" });
   assert.deepStrictEqual(list.map(t => t.name + " " + t.levelName), ["Wave clear High", "CC Mid", "Poke Mid", "Vision Low"]);
   assert.deepStrictEqual(F.traitList(undefined), []);

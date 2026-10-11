@@ -10,7 +10,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(ROOT, "site")
 SITE_FILES = ["index.html", "style.css", "app.js", "format.js", "settings.js", "data/latest.json"]
-COLUMNS = ["rank", "champion", "tier", "Mastery", "Pick Score", "Comfort", "Stats", "OTP", "Win rate", "vs average", "Games"]
+COLUMNS = ["rank", "champion", "tier", "Pick Score", "Comfort", "Stats", "OTP", "Win rate", "vs average", "Games"]
 
 
 def read(name):

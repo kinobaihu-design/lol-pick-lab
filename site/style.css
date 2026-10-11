@@ -51,11 +51,12 @@ th[aria-sort="descending"]::after { content: " \25BC"; font-size: 10px; }
 .champbtn:hover, .champbtn:focus-visible { text-decoration: underline; }
 .champbtn::after { content: " \25B8"; color: var(--muted); font-size: 11px; }
 .champbtn[aria-expanded="true"]::after { content: " \25BE"; }
-.mastery { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
-  border: 1.5px solid currentColor; }
-.mastery-main { color: var(--m-main); background: color-mix(in srgb, var(--m-main) 16%, transparent); }
-.mastery-good { color: var(--m-good); } .mastery-average { color: var(--m-average); }
-.mastery-below_average { color: var(--m-below); } .mastery-never_played { color: var(--m-never); font-weight: 600; }
+.mastery { display: flex; justify-content: flex-end; gap: 2px; margin-top: 4px; cursor: help; }
+.mastery i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+.mastery i.on { background: currentColor; }
+.mastery-main { color: var(--m-main); } .mastery-good { color: var(--m-good); }
+.mastery-average { color: var(--m-average); } .mastery-below_average { color: var(--m-below); }
+.mastery-never_played { color: var(--m-never); }
 .sub { display: block; white-space: normal; min-width: 70px; font-size: 11px; font-weight: 400; color: var(--muted); }
 .warnsign { color: #c77800; cursor: help; }
 .sample-Low { color: var(--down); } .sample-Medium { color: var(--muted); } .sample-High { color: var(--up); }

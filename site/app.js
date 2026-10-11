@@ -55,12 +55,18 @@
     return td;
   }
 
-  var COLSPAN = 11;
+  var COLSPAN = 10;
   var state = { data: null, list: [], rankOf: {}, key: "pick_score", dir: "desc", open: {} };
 
-  function badge(c) {
-    var m = el("span", "mastery mastery-" + c.mastery, F.masteryText(c.mastery));
-    return m;
+  // Mastery as 5 small dots (more filled = better), colored by level; the name is in the tooltip.
+  function masteryIcon(c) {
+    var level = F.masteryLevel(c.mastery);
+    var icon = el("span", "mastery mastery-" + c.mastery);
+    icon.title = "Mastery: " + F.masteryText(c.mastery);
+    icon.setAttribute("role", "img");
+    icon.setAttribute("aria-label", "Mastery: " + F.masteryText(c.mastery));
+    for (var i = 1; i <= 5; i++) icon.appendChild(el("i", i <= level ? "on" : ""));
+    return icon;
   }
 
   function detailRow(c) {
@@ -83,6 +89,7 @@
 
     var data = el("div");
     data.appendChild(el("h3", null, "Data"));
+    if (c.mastery) data.appendChild(el("p", null, "Mastery: " + F.masteryText(c.mastery)));
     var label = F.dataLabel(c);
     if (label) data.appendChild(el("p", null, label));
     data.appendChild(el("p", null, "Sample size: " + F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS) +
@@ -127,12 +134,9 @@
       tierCell.appendChild(el("span", "tier tier-" + c.tier, F.tierText(c)));
       tr.appendChild(tierCell);
 
-      var masteryCell = el("td");
-      if (c.mastery) masteryCell.appendChild(badge(c));
-      tr.appendChild(masteryCell);
-
       cell(tr, F.number(c.pick_score, 1), "num score");
-      cell(tr, F.number(c.comfort, 1), "num");
+      var comfortCell = cell(tr, F.number(c.comfort, 1), "num");
+      if (c.mastery) comfortCell.appendChild(masteryIcon(c));
       cell(tr, F.number(c.stats, 1), "num");
 
       var otpCell = cell(tr, F.number(c.otp_points, 1), "num");
