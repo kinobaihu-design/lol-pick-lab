@@ -48,9 +48,6 @@ def results_text(res):
          for c in res["pick_score_list"]]))
     out.append("(* = tier held down to B by the stats floor)")
 
-    out.append("\n## Tier counts under different boundaries")
-    out.append(tier_comparison_text(res))
-
     out.append("\n## Ban threat, top 5 (any role)")
     out.append(table(
         ["#", "Champion", "Role (share of its games)", "Ban threat", "Win rate vs avg", "Pick rate", "Bot-lane champion?"],
@@ -85,47 +82,3 @@ def results_text(res):
         out.append("\nCards that did not pass the filters this patch: " + ", ".join(res["cards_not_ranked"]))
     return "\n".join(out)
 
-
-# ------------------------------------------------------------ tier comparison
-
-COMPARISON_EDGES = [1.0, 1.25, 1.5]   # the S / D boundary, in spreads; A/B and B/C stay at +-0.5
-
-
-def tier_settings(edges=None):
-    """Named tier settings: the S and D boundary at each edge, plus the old fixed cutoffs."""
-    settings = []
-    for edge in edges or COMPARISON_EDGES:
-        bounds = [("S", edge), ("A", 0.5), ("B", -0.5), ("C", -edge)]
-        settings.append(("+/-%g spreads" % edge, lambda c, b=bounds: model.tier_of(c["spreads"], c["win_rate_delta"], b)[0]))
-    settings.append(("Old fixed (80/72/64/56)", lambda c: model.old_fixed_tier_of(c["pick_score"], c["win_rate_delta"])))
-    return settings
-
-
-def tier_comparison(res, edges=None):
-    """Counts per tier for each setting, and the champions whose tier is not the same everywhere."""
-    settings = tier_settings(edges)
-    champs = res["pick_score_list"]
-    counts, tiers = {}, {c["name"]: [] for c in champs}
-    for label, fn in settings:
-        counts[label] = {t: 0 for t in "SABCD"}
-        for c in champs:
-            t = fn(c)
-            counts[label][t] += 1
-            tiers[c["name"]].append(t)
-    labels = [label for label, _ in settings]
-    changing = [(c["name"], c["pick_score"], c["spreads"], c["win_rate_delta"], tiers[c["name"]])
-                for c in champs if len(set(tiers[c["name"]])) > 1]
-    return labels, counts, changing
-
-
-def tier_comparison_text(res, edges=None):
-    labels, counts, changing = tier_comparison(res, edges)
-    out = [table(["Setting", "S", "A", "B", "C", "D"],
-                 [[label] + [counts[label][t] for t in "SABCD"] for label in labels])]
-    out.append("\nChampions whose tier is not the same in every setting:")
-    if changing:
-        out.append(table(["Champion", "Pick Score", "Spreads", "Win rate vs avg"] + labels,
-                         [(n, "%.1f" % ps, "%+.2f" % z, "%+.2f" % d) + tuple(t) for n, ps, z, d, t in changing]))
-    else:
-        out.append("None.")
-    return "\n".join(out)

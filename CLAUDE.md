@@ -83,7 +83,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
    - **OTP rule (for now):** a Diamond+ player is an OTP of a champion when at least 55% of their recent ranked games are on it, and they have at least 50 games on it this season.
    - The tier list shows the number of OTP players and OTP games behind each OTP score.
 5. **Pick Score** = `0.425 × Stats + 0.525 × Comfort + 0.05 × OTP`.
-6. **Tier (v0.35):** each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** = +1.5 spreads or more **and** a win rate at or above the Diamond+ average (otherwise A) · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`). The S and D boundary (1.0, 1.25 or 1.5 spreads) is still being chosen by the owner, calibrated in Phase 2 against the owner's gut ranking of 10 ADCs.
+6. **Tier (v0.35):** each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** = +1.5 spreads or more **and** a win rate at or above the Diamond+ average (otherwise A) · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`). The S and D boundary is confirmed at 1.5 spreads (Oct 11).
 
 **Other lists:**
 - **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at a target mastery: Never played and Below average as if Good; Average and Good one level up. It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Good"). There are two kinds of advice:
@@ -124,7 +124,7 @@ Comfort measures how much the owner likes a champion and how well they play it. 
 | Below average | 70 | 80% | 25% | Knows how it works; can jump in and try to win |
 | Never played | 60 | 100% | 0% | Knows nothing about it; would struggle |
 
-**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average is recalculated each patch from the eligible bot-lane champions, ADCs and APCs together (v0.31). Until real data exists it's the average of all 32 cards: 13.656, shown in the brief as 13.7. An average champion gets 0, so scores don't inflate.
+**Step 3: kit adjustment** = `0.9 × (trait score − average trait score)`, capped at ±5 on Comfort (±2.5 on the Pick Score). The average is recalculated each patch from the eligible bot-lane champions, ADCs and APCs together (v0.31). Until real data exists it's the average of all 39 cards: 13.897, shown in the brief as 13.9. An average champion gets 0, so scores don't inflate.
 - Trait score = sum of `priority × level`. Levels: Low 0.5 · Mid 1 · High 1.5.
 - **Every trait gets at least Low if the champion has any of it.** A trait is left empty only when it's truly absent, which should be the exception. A trait that defines the champion's type isn't listed again.
 
@@ -153,7 +153,7 @@ Comfort measures how much the owner likes a champion and how well they play it. 
 
 ## Champion cards (bot lane: ADC and APC)
 
-32 cards: 26 ADCs and 6 APCs (marked †). The Comfort column is the brief's result and serves as test data for the scoring code. Claude recalculated all 32 from the inputs below, and every one matched within 0.04. Trait levels are listed in priority order: wave clear, team utility, AoE, CC, sustain, burst, poke, vision; "—" means absent.
+39 cards: 26 ADCs and 13 APCs. The table below is the original 32 from brief v0.34; its Comfort numbers are out of date because the trait average moved from 13.7 to 13.9. Current numbers and the 7 new cards are in `scoring/cards.json` and the "Brief changes v0.35" block below. Original text (APCs marked †): The Comfort column is the brief's result and serves as test data for the scoring code. Claude recalculated all 32 from the inputs below, and every one matched within 0.04 (v0.34). Trait levels are listed in priority order: wave clear, team utility, AoE, CC, sustain, burst, poke, vision; "—" means absent.
 
 | Champion | Main type (str) / secondary (str) | Type pts | Mastery | Wave · TU · AoE · CC · Sus · Burst · Poke · Vis | Trait score | Difficulty Riot / mine → final | Range (adj) | Comfort |
 |---|---|---|---|---|---|---|---|---|
@@ -218,6 +218,20 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
 
+## Brief changes v0.35 (no model change), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- Pick rate: keep the current "total games = Diamond+ players ÷ 10" method. Keep the note in `config.py`.
+- Nilah stays in the bot-lane pool (proper ADC). `EXCLUDED_FROM_POOL` stays Yasuo and Katarina only.
+- Vladimir is ranged (450, LoL Wiki), not melee.
+- Tier boundaries confirmed at ±0.5 / ±1.5 spreads. The 1.0 and 1.25 comparison is removed from the report (`scoring/report.py`; done Oct 11).
+- New for the tier-list page (build it with the page, not now): a "Carded but not ranked" line naming each carded champion that failed the filters and which filter it failed (e.g. Senna: bot-lane pick rate below 0.8%).
+- 7 new bot-lane cards: Aurelion Sol, Karthus, Swain, Veigar, Vladimir (secondary Peel High), Seraphine, Mel (secondary Peel Low). They leave the "Needs a card" list. Cards are in `scoring/cards.json` (done).
+- Ziggs Wave clear confirmed High. Xerath difficulty now High / High (3.0).
+- Trait average is now 13.9 (39 cards). Kit adjustments recalculated for every card; the Comfort numbers in `cards.json` now come from the live brief (e.g. Sivir 98.7, Seraphine 89.0).
+- Rule: types and trait levels are the owner's opinion; only numbers (ranges, Riot difficulty, item stats) get fact-checked.
+
 ## Project board
 
 **Phase 0, setup:** all done.
@@ -245,7 +259,7 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 **Phase 4, later**
 - [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
 - [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
-- [ ] Make cards for new bot-lane champions that pass the filters (Seraphine, Aurelion Sol, Karthus, Veigar, plus any the first results show)
+- [x] Make cards for new bot-lane champions that pass the filters (Aurelion Sol, Karthus, Swain, Veigar, Vladimir, Seraphine, Mel; done Oct 11; more if the "Needs a card" list grows)
 - [ ] Get an email from GitHub when a collector run fails
 - [ ] Apply for a production key if the site grows beyond friends
 
@@ -253,11 +267,10 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 
 **Decide before or during Phase 2**
 - **Ban list check:** the owner's bans in the last 3 months were Tristana, and they'd also ban Yunara or Jinx. Does the Ban threat ranking put them near the top? (Bans go by data, not by these examples.)
-- **Tier boundaries:** choose the S and D boundary (1.0, 1.25 or 1.5 spreads; A/B and B/C stay at ±0.5) and check the stats floor. Calibrate in Phase 2.
+- **Tier boundaries:** confirmed at ±0.5 / ±1.5 spreads (Oct 11). Still check the stats floor in Phase 2.
 - Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
 - **Are Pick Scores spread enough?** Comfort for the owner's pool sits mostly between 86 and 100, so Stats should do most of the separating. Check with real data and widen the gaps if the tiers feel too similar.
 - Review all cards' traits with the "at least Low" rule (only Lucian is done so far), and fill in mastery and difficulty for any remaining draft cards.
-- **Mage cards:** confirm Ziggs's Wave clear (assumed High) and Xerath's difficulty (set between Medium and High).
 - Flexibility bonus (beta, Varus only): check in Phase 2 whether it's worth keeping or extending.
 - **Calibration list** (the owner's opinion, written Oct 3 before any data): the strongest bot-lane champions this meta, unordered: Jinx, Hwei, Lux, Tristana, Xayah, Caitlyn, Viktor, Ziggs, Twitch, Yunara, Zeri, Ashe, Draven. Test in Phase 2: do they land at the top of the Meta Score (data only)?
 - **Cards per role (Phase 2 design note from the owner):** store champion cards per champion + role, with the same card structure, but each role has its own types, trait list and priorities. A champion can have a bot-lane card and a support card.
