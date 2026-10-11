@@ -44,9 +44,104 @@
       .map(function (x) { return x.champ; });
   }
 
-  // "B*" when the stats floor held the champion down to B.
   function tierText(champ) {
-    return champ.tier + (champ.tier_capped_by_floor ? "*" : "");
+    return champ.tier;
+  }
+
+  // ---- slice 2 ----
+
+  var MASTERY_NAMES = { main: "Main", good: "Good", average: "Average", below_average: "Below average",
+                        never_played: "Never played" };
+  var MASTERY_ORDER = ["never_played", "below_average", "average", "good", "main"];   // weak to strong
+  var TRAIT_ORDER = ["wave_clear", "team_utility", "aoe", "cc", "sustain", "burst", "poke", "vision"];
+  var TRAIT_NAMES = { wave_clear: "Wave clear", team_utility: "Team utility", aoe: "AoE", cc: "CC",
+                      sustain: "Sustain", burst: "Burst", poke: "Poke", vision: "Vision" };
+  var LEVEL_NAMES = { low: "Low", mid: "Mid", high: "High" };
+  var TIER_ORDER = ["D", "C", "B", "A", "S"];                                          // weak to strong
+
+  function masteryText(key) {
+    return MASTERY_NAMES[key] || "";
+  }
+
+  // The traits that exist on the card, in the owner's priority order, with their level.
+  function traitList(traits) {
+    var out = [];
+    TRAIT_ORDER.forEach(function (key) {
+      var level = traits && traits[key];
+      if (level) out.push({ key: key, name: TRAIT_NAMES[key], level: level, levelName: LEVEL_NAMES[level] || level });
+    });
+    return out;
+  }
+
+  // "Low", "Medium" or "High" by real games (this patch + last patch, before any double weight).
+  // Below the Low limit the sample is "Very low" (such champions are normally not ranked at all).
+  function sampleLabel(realGames, limits) {
+    var n = Number(realGames);
+    if (n >= limits.high) return "High";
+    if (n >= limits.medium) return "Medium";
+    if (n >= limits.low) return "Low";
+    return "Very low";
+  }
+
+  // "Data: 96% this patch". The scores file writes it; if it is missing, work it out.
+  function dataLabel(champ) {
+    if (champ.data_label) return champ.data_label;
+    if (typeof champ.this_patch_share === "number") return "Data: " + Math.round(100 * champ.this_patch_share) + "% this patch";
+    return "";
+  }
+
+  // A win rate this far (or more) below the Diamond+ average gets a warning sign (display only).
+  function hasWinRateWarning(champ, limit) {
+    if (typeof champ.win_rate_warning === "boolean") return champ.win_rate_warning;
+    return Number(champ.win_rate_delta) <= limit;
+  }
+
+  function otpText(champ) {
+    var players = champ.otp_players || 0, games = champ.otp_games || 0;
+    if (!games) return "no OTP games yet";
+    return players + (players === 1 ? " OTP player" : " OTP players") + ", " +
+      Math.round(games).toLocaleString("en-US") + (games === 1 ? " OTP game" : " OTP games");
+  }
+
+  // One text for a card that missed the filters: "Senna: bot-lane pick rate under 0.8%".
+  // Older score files only list the names.
+  function notRankedText(entry) {
+    if (typeof entry === "string") return entry;
+    var why = entry.failed && entry.failed.length ? entry.failed.join("; ") : "did not pass the filters";
+    return entry.name + ": " + why;
+  }
+
+  // Each sortable column: what to sort by, and which way is the first click ("desc" = best first).
+  var SORT_COLUMNS = {
+    rank:    { first: "desc", value: function (c) { return c.pick_score; } },
+    champion:{ first: "asc",  value: function (c) { return c.name.toLowerCase(); } },
+    tier:    { first: "desc", value: function (c) { return TIER_ORDER.indexOf(c.tier); }, then: "pick_score" },
+    mastery: { first: "desc", value: function (c) { return MASTERY_ORDER.indexOf(c.mastery); }, then: "pick_score" },
+    pick_score: { first: "desc", value: function (c) { return c.pick_score; } },
+    comfort: { first: "desc", value: function (c) { return c.comfort; } },
+    stats:   { first: "desc", value: function (c) { return c.stats; } },
+    otp:     { first: "desc", value: function (c) { return c.otp_points; } },
+    win_rate:{ first: "desc", value: function (c) { return c.win_rate; } },
+    vs_average: { first: "desc", value: function (c) { return c.win_rate_delta; } },
+    games:   { first: "desc", value: function (c) { return c.real_games; } }
+  };
+
+  function firstDirection(key) {
+    return SORT_COLUMNS[key] ? SORT_COLUMNS[key].first : "desc";
+  }
+
+  // Sorted copy of the list. `direction` is "asc" or "desc". Ties keep Pick Score order, then the file's order.
+  function sortRows(list, key, direction) {
+    var col = SORT_COLUMNS[key] || SORT_COLUMNS.pick_score;
+    var sign = direction === "asc" ? 1 : -1;
+    return list
+      .map(function (c, i) { return { champ: c, i: i }; })
+      .sort(function (a, b) {
+        var x = col.value(a.champ), y = col.value(b.champ);
+        if (x !== y) return x < y ? -sign : sign;
+        return (b.champ.pick_score - a.champ.pick_score) || (a.i - b.i);
+      })
+      .map(function (x) { return x.champ; });
   }
 
   function looksLikeScores(data) {
@@ -55,7 +150,10 @@
   }
 
   var api = { number: number, signed: signed, games: games, ageHours: ageHours, isStale: isStale,
-              describeAge: describeAge, ranked: ranked, tierText: tierText, looksLikeScores: looksLikeScores };
+              describeAge: describeAge, ranked: ranked, tierText: tierText, looksLikeScores: looksLikeScores,
+              masteryText: masteryText, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
+              hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
+              sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Format = api;
 })(typeof window !== "undefined" ? window : this);

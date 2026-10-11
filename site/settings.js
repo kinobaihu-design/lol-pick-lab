@@ -6,11 +6,14 @@
     DATA_URL: "https://raw.githubusercontent.com/kinobaihu-design/lol-pick-lab/data/scores/latest.json",
     // A saved copy shipped with the page, used only when DATA_URL can't be reached (the page says so).
     FALLBACK_URL: "data/latest.json",
-    // Sample-size labels, by real games (this patch + last patch together). The label itself
-    // arrives in slice 2; the limits live here so they can be retuned in one place.
+    // Sample-size labels, by real games (this patch + last patch together, before any double
+    // weight): Low from 1,000, Medium from 3,000, High from 10,000. Retune them here.
     SAMPLE_SIZE_LIMITS: { low: 1000, medium: 3000, high: 10000 },
     // The collector saves every 6 hours; if the scores are older than this, the page warns.
-    STALE_AFTER_HOURS: 13
+    STALE_AFTER_HOURS: 13,
+    // A win rate this many points (or more) below the Diamond+ average gets a warning sign.
+    // Display only: it never changes a tier. Used only if the scores file doesn't say.
+    WIN_RATE_WARNING_DELTA: -1.5
   };
   if (typeof module !== "undefined" && module.exports) module.exports = SETTINGS;
   else root.SETTINGS = SETTINGS;

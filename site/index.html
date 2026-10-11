@@ -24,22 +24,30 @@
       <table>
         <thead>
           <tr>
-            <th class="num" title="Place in the list, by Pick Score">#</th>
-            <th>Champion</th>
-            <th>Tier</th>
-            <th class="num" title="The main number: 42.5% Stats, 52.5% Comfort, 5% OTP">Pick Score</th>
-            <th class="num" title="How much you like and play the champion (from your card)">Comfort</th>
-            <th class="num" title="Win rate and pick rate points from Diamond+ games">Stats</th>
-            <th class="num" title="How well one-trick players do on it, pulled toward 50 when there are few">OTP</th>
-            <th class="num" title="Diamond+ win rate, blended with last patch early in a patch">Win rate</th>
-            <th class="num" title="Difference from the Diamond+ average win rate">vs average</th>
-            <th class="num" title="Real games counted, this patch and last patch together">Games</th>
+            <th class="num" data-sort="rank" title="Place by Pick Score. Click to sort">#</th>
+            <th data-sort="champion" title="Click a champion to see its traits and details">Champion</th>
+            <th data-sort="tier" title="From the Pick Score: how far it is above or below this patch's average">Tier</th>
+            <th data-sort="mastery" title="How well you play it (from your card)">Mastery</th>
+            <th class="num" data-sort="pick_score" title="The main number: 42.5% Stats, 52.5% Comfort, 5% OTP">Pick Score</th>
+            <th class="num" data-sort="comfort" title="How much you like and play the champion (from your card)">Comfort</th>
+            <th class="num" data-sort="stats" title="Win rate and pick rate points from Diamond+ games">Stats</th>
+            <th class="num" data-sort="otp" title="How well one-trick players do on it, pulled toward 50 when there are few">OTP</th>
+            <th class="num" data-sort="win_rate" title="Diamond+ win rate, blended with last patch early in a patch">Win rate</th>
+            <th class="num" data-sort="vs_average" title="Difference from the Diamond+ average win rate">vs average</th>
+            <th class="num" data-sort="games" title="Real games counted, this patch and last patch together">Games</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <p class="foot">* = held down to B by the stats floor. Games = Diamond+ games on this champion in bot lane, this patch and last patch together.</p>
+    <p class="foot">Click a column title to sort, click again to reverse. Click a champion for its traits and details.
+      &#9888; = win rate 1.5 points or more below the Diamond+ average (a warning only; the tier doesn't change).
+      Games = Diamond+ games on this champion in bot lane, this patch and last patch together.
+      Sample size: Low 1,000&ndash;2,999, Medium 3,000&ndash;9,999, High 10,000+.</p>
+    <section id="notranked" hidden>
+      <h2>Carded but not ranked</h2>
+      <ul id="notranked-list"></ul>
+    </section>
   </div>
 </main>
 <script src="settings.js"></script>

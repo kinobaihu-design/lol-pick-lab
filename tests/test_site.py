@@ -10,7 +10,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(ROOT, "site")
 SITE_FILES = ["index.html", "style.css", "app.js", "format.js", "settings.js", "data/latest.json"]
-COLUMNS = ["rank", "champion", "tier", "Pick Score", "Comfort", "Stats", "OTP", "Win rate", "vs average", "Games"]
+COLUMNS = ["rank", "champion", "tier", "Mastery", "Pick Score", "Comfort", "Stats", "OTP", "Win rate", "vs average", "Games"]
 
 
 def read(name):
@@ -48,6 +48,22 @@ class SiteFilesTests(unittest.TestCase):
             colors[tier] = match.group(1).strip()
         self.assertEqual(len(set(colors.values())), 5)
 
+    def test_every_column_can_be_sorted(self):
+        html = read("index.html")
+        keys = re.findall(r'<th[^>]*data-sort="([^"]+)"', html)
+        self.assertEqual(len(keys), len(COLUMNS))
+        for key in keys:
+            self.assertIn("%s:" % key, read("format.js"))
+
+    def test_the_page_does_not_remember_the_sort(self):
+        code = read("app.js") + read("format.js")
+        for word in ("localStorage", "sessionStorage", "document.cookie", "location.hash"):
+            self.assertNotIn(word, code)
+
+    def test_page_opens_sorted_by_pick_score_and_has_the_not_ranked_line(self):
+        self.assertIn('key: "pick_score", dir: "desc"', read("app.js"))
+        self.assertIn("Carded but not ranked", read("index.html"))
+
     def test_sample_size_limits_are_in_settings(self):
         text = read("settings.js")
         self.assertRegex(text, r"SAMPLE_SIZE_LIMITS:\s*\{\s*low:\s*1000,\s*medium:\s*3000,\s*high:\s*10000\s*\}")
@@ -81,19 +97,29 @@ class SiteDataTests(unittest.TestCase):
         self.assertRegex(self.data["generated"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
 
     def test_every_row_has_what_the_table_shows(self):
-        keys = ["name", "tier", "tier_capped_by_floor", "pick_score", "comfort", "stats", "otp_points",
-                "win_rate", "win_rate_delta", "real_games"]
+        keys = ["name", "tier", "win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games",
+                "pick_score", "comfort", "stats", "otp_points", "win_rate", "win_rate_delta", "real_games"]
         self.assertGreater(len(self.data["pick_score_list"]), 0)
         for row in self.data["pick_score_list"]:
             for key in keys:
                 self.assertIn(key, row, "%s is missing %s" % (row.get("name"), key))
             self.assertIn(row["tier"], "SABCD")
+            self.assertNotIn("tier_capped_by_floor", row)
+
+    def test_no_champion_has_a_win_rate_warning_that_disagrees_with_the_number(self):
+        for row in self.data["pick_score_list"]:
+            self.assertEqual(row["win_rate_warning"], row["win_rate_delta"] <= -1.5, row["name"])
+
+    def test_cards_not_ranked_say_why(self):
+        for entry in self.data["cards_not_ranked"]:
+            self.assertTrue(entry["failed"], entry["name"])
 
     def test_the_scoring_code_still_writes_those_fields(self):
         """If the scoring code stops writing a field, the page would show gaps; catch it here."""
         with open(os.path.join(ROOT, "scoring", "model.py"), encoding="utf-8") as f:
             source = f.read()
-        for key in ("tier_capped_by_floor", "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort"):
+        for key in ("win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games", "cards_not_ranked",
+                    "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort"):
             self.assertIn('"%s"' % key, source)
 
 

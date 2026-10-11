@@ -3,17 +3,19 @@
   --up: #1b8a4b; --down: #c0392b;
   --S: #f2b01e; --S-text: #3a2a00; --A: #2e9d5b; --B: #3b78d8; --C: #7d6fb0; --D: #c4564a;
   --warn-bg: #fff4d6; --bad-bg: #fde4e1;
+  --m-main: #b7860b; --m-good: #1b8a4b; --m-average: #2f6fd0; --m-below: #7a6a99; --m-never: #7b8494;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14171d; --card: #1c2029; --text: #e8ebf1; --muted: #9aa3b4; --line: #2c3240;
     --up: #4fc283; --down: #f0786b; --warn-bg: #43380f; --bad-bg: #4a1f1b;
+    --m-main: #f2b01e; --m-good: #4fc283; --m-average: #6fa3f0; --m-below: #a597c9; --m-never: #8b94a5;
   }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text);
   font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
 h1 { margin: 0 0 12px; font-size: 28px; }
 .facts { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0 0 16px; }
 .facts div { min-width: 120px; }
@@ -26,7 +28,7 @@ h1 { margin: 0 0 12px; font-size: 28px; }
 .notice.bad { background: var(--bad-bg); }
 .tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
 table { width: 100%; border-collapse: collapse; }
-th, td { padding: 9px 12px; text-align: left; white-space: nowrap; }
+th, td { padding: 8px 9px; text-align: left; white-space: nowrap; }
 th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
   border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; }
 tbody tr + tr td { border-top: 1px solid var(--line); }
@@ -41,4 +43,32 @@ tbody tr:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
 .tier-S { background: var(--S); color: var(--S-text); } .tier-A { background: var(--A); }
 .tier-B { background: var(--B); } .tier-C { background: var(--C); } .tier-D { background: var(--D); }
 .foot { color: var(--muted); font-size: 13px; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]:hover { color: var(--text); }
+th[aria-sort="ascending"]::after { content: " \25B2"; font-size: 10px; }
+th[aria-sort="descending"]::after { content: " \25BC"; font-size: 10px; }
+.champbtn { all: unset; cursor: pointer; font-weight: 600; }
+.champbtn:hover, .champbtn:focus-visible { text-decoration: underline; }
+.champbtn::after { content: " \25B8"; color: var(--muted); font-size: 11px; }
+.champbtn[aria-expanded="true"]::after { content: " \25BE"; }
+.mastery { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  border: 1.5px solid currentColor; }
+.mastery-main { color: var(--m-main); background: color-mix(in srgb, var(--m-main) 16%, transparent); }
+.mastery-good { color: var(--m-good); } .mastery-average { color: var(--m-average); }
+.mastery-below_average { color: var(--m-below); } .mastery-never_played { color: var(--m-never); font-weight: 600; }
+.sub { display: block; white-space: normal; min-width: 70px; font-size: 11px; font-weight: 400; color: var(--muted); }
+.warnsign { color: #c77800; cursor: help; }
+.sample-Low { color: var(--down); } .sample-Medium { color: var(--muted); } .sample-High { color: var(--up); }
+tr.detail td { white-space: normal; background: color-mix(in srgb, var(--text) 3%, transparent); padding: 12px 16px 16px; }
+.detailgrid { display: flex; flex-wrap: wrap; gap: 14px 40px; }
+.detailgrid h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.detailgrid p { margin: 0 0 3px; }
+.traits { display: flex; flex-wrap: wrap; gap: 6px; max-width: 520px; }
+.trait { padding: 2px 9px; border-radius: 6px; font-size: 12px; border: 1px solid var(--line); background: var(--card); }
+.trait b { font-weight: 700; }
+.trait-low { opacity: .7; }
+.trait-mid { border-color: color-mix(in srgb, var(--B) 55%, var(--line)); }
+.trait-high { border-color: var(--B); background: color-mix(in srgb, var(--B) 14%, var(--card)); }
+#notranked h2 { font-size: 16px; margin: 16px 0 6px; }
+#notranked ul { margin: 0; padding-left: 20px; }
 @media (max-width: 700px) { h1 { font-size: 22px; } th, td { padding: 8px 8px; } .score { font-size: 17px; } }

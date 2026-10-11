@@ -1,10 +1,10 @@
-"""Scoring settings (model v0.35). Change numbers here, not in the rest of the code.
+"""Scoring settings (model v0.36). Change numbers here, not in the rest of the code.
 
 Every number below comes from the project brief. If the brief changes, change it here
 and bump MODEL_VERSION.
 """
 
-MODEL_VERSION = "v0.35"
+MODEL_VERSION = "v0.36"
 
 # ---- Pick Score = 0.425 x Stats + 0.525 x Comfort + 0.05 x OTP ----
 WEIGHT_STATS = 0.425
@@ -83,18 +83,15 @@ OTP_MIN_SHARE_OF_RECENT_GAMES = 0.55   # recent = this patch + last patch
 OTP_MIN_SEASON_GAMES = 50
 OTP_RELIABILITY_K = 300                # reliability = OTP games / (OTP games + K)
 
-# ---- Tiers (v0.35) ----
-# A champion's tier comes from how far its Pick Score is from this patch's average Pick Score,
-# measured in standard deviations ("spreads"). Only champions with a Pick Score (a card) count.
-# Each pair is (tier, lowest number of spreads for it); below the last one is D.
+# ---- Tiers (v0.36) ----
+# A champion's tier comes from the Pick Score only: how far it is from this patch's average Pick
+# Score, measured in standard deviations ("spreads"). Only champions with a Pick Score (a card)
+# count. Each pair is (tier, lowest number of spreads for it); below the last one is D.
+# There is no stats floor and no win rate condition on S any more (removed in v0.36).
 TIER_BOUNDARIES = [("S", 1.5), ("A", 0.5), ("B", -0.5), ("C", -1.5)]
-# S also needs a win rate at or above the Diamond+ average; if it is below, the tier is A.
-S_MIN_WIN_RATE_DELTA = 0.0
-STATS_FLOOR = -1.5                     # win rate this far (or more) below the average caps the tier
-STATS_FLOOR_TIER = "B"
-TIER_RANK = {"S": 0, "A": 1, "B": 2, "C": 3, "D": 4}
-# The old v0.34 fixed cutoffs on the Pick Score. Used only by the comparison table.
-OLD_FIXED_CUTOFFS = [("S", 80.0), ("A", 72.0), ("B", 64.0), ("C", 56.0)]
+# Display only, no effect on the tier: a win rate this far (or more) below the Diamond+ average
+# gets a warning sign next to it on the page.
+WIN_RATE_WARNING_DELTA = -1.5
 
 # ---- Growth advisor ----
 # Only champions with a card (Comfort needs one). Never played and Below average are scored as if

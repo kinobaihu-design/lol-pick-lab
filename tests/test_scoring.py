@@ -83,33 +83,36 @@ class SmallHelperTests(unittest.TestCase):
     def test_spreads_and_tiers(self):
         self.assertEqual(model.spreads_from_average(75, 65, 5), 2.0)
         self.assertEqual(model.spreads_from_average(75, 65, 0), 0.0)        # no spread at all
-        self.assertEqual(model.tier_of(1.5, 0.5)[0], "S")                   # boundaries count as inside
-        self.assertEqual(model.tier_of(1.49, 0.5)[0], "A")
-        self.assertEqual(model.tier_of(0.5)[0], "A")
-        self.assertEqual(model.tier_of(0.49)[0], "B")
-        self.assertEqual(model.tier_of(-0.5)[0], "B")
-        self.assertEqual(model.tier_of(-0.51)[0], "C")
-        self.assertEqual(model.tier_of(-1.5)[0], "C")
-        self.assertEqual(model.tier_of(-1.51)[0], "D")
+        self.assertEqual(model.tier_of(1.5), "S")                   # boundaries count as inside
+        self.assertEqual(model.tier_of(1.49), "A")
+        self.assertEqual(model.tier_of(0.5), "A")
+        self.assertEqual(model.tier_of(0.49), "B")
+        self.assertEqual(model.tier_of(-0.5), "B")
+        self.assertEqual(model.tier_of(-0.51), "C")
+        self.assertEqual(model.tier_of(-1.5), "C")
+        self.assertEqual(model.tier_of(-1.51), "D")
 
-    def test_s_needs_a_win_rate_at_or_above_the_average(self):
-        self.assertEqual(model.tier_of(2.0, 0.0)[0], "S")
-        self.assertEqual(model.tier_of(2.0, -0.01)[0], "A")                 # strong score, weak win rate
-        self.assertEqual(model.tier_of(2.0, -1.4)[0], "A")
+    def test_tier_follows_the_pick_score_only(self):
+        # v0.36: no stats floor, no win rate condition on S
+        self.assertEqual(model.tier_of(2.0), "S")
+        self.assertEqual(model.tier_of(1.0), "A")
+        self.assertEqual(model.tier_of(-3.0), "D")
+        self.assertEqual(model.tier_of(0.66), "A")                          # Caitlyn on patch 16.20 data: was B* before
+        import inspect
+        self.assertEqual(list(inspect.signature(model.tier_of).parameters), ["spreads"])
 
-    def test_stats_floor(self):
-        self.assertEqual(model.tier_of(1.0, -1.5), ("B", True))
-        self.assertEqual(model.tier_of(0.0, -3), ("B", False))              # already B
-        self.assertEqual(model.tier_of(-1.0, -3), ("C", False))             # the floor only lowers
+    def test_win_rate_warning_is_display_only(self):
+        self.assertTrue(model.win_rate_warning(-1.5))
+        self.assertTrue(model.win_rate_warning(-3.0))
+        self.assertFalse(model.win_rate_warning(-1.49))
+        self.assertFalse(model.win_rate_warning(1.0))
 
-    def test_other_boundaries_and_old_cutoffs(self):
-        wide = [("S", 1.0), ("A", 0.5), ("B", -0.5), ("C", -1.0)]
-        self.assertEqual(model.tier_of(1.0, 1.0, wide)[0], "S")
-        self.assertEqual(model.tier_of(-1.0, 1.0, wide)[0], "C")
-        self.assertEqual(model.old_fixed_tier_of(80.0), "S")
-        self.assertEqual(model.old_fixed_tier_of(79.96), "S")               # shown as 80.0
-        self.assertEqual(model.old_fixed_tier_of(55.9), "D")
-        self.assertEqual(model.old_fixed_tier_of(85, -1.5), "B")
+    def test_failed_filters_reasons(self):
+        c = {"real_games": 5000, "lane_share": 0.9, "pick_rate": 0.005}
+        self.assertEqual(model.failed_filters(c), ["bot-lane pick rate under 0.8%"])
+        c = {"real_games": 500, "lane_share": 0.05, "pick_rate": 0.5}
+        self.assertEqual(len(model.failed_filters(c)), 2)
+        self.assertEqual(model.failed_filters({"real_games": 5000, "lane_share": 0.9, "pick_rate": 0.5}), [])
 
     def test_weights_add_up(self):
         self.assertAlmostEqual(config.WEIGHT_STATS + config.WEIGHT_COMFORT + config.WEIGHT_OTP, 1.0)

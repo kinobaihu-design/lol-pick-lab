@@ -41,12 +41,12 @@ def results_text(res):
     out.append(table(
         ["#", "Champion", "Tier", "Pick Score", "Spreads", "Meta Score", "% this patch", "Stats", "Comfort", "OTP",
          "Win rate vs avg", "Pick rate", "Games"],
-        [(c["pick_rank"], c["name"], c["tier"] + ("*" if c["tier_capped_by_floor"] else ""), "%.1f" % c["pick_score"],
+        [(c["pick_rank"], c["name"], c["tier"], "%.1f" % c["pick_score"],
           "%+.2f" % c["spreads"], "%.1f" % c["meta_score"], c["data_label"].replace("Data: ", "").replace(" this patch", ""),
           "%.1f" % c["stats"], "%.1f" % c["comfort"], "%.1f" % c["otp_points"],
-          "%+.2f" % c["win_rate_delta"], pct(c["pick_rate"]), c["real_games"])
+          "%+.2f" % c["win_rate_delta"] + (" !" if c["win_rate_warning"] else ""), pct(c["pick_rate"]), c["real_games"])
          for c in res["pick_score_list"]]))
-    out.append("(* = tier held down to B by the stats floor)")
+    out.append("(! = win rate 1.5% or more below the Diamond+ average; display only, no effect on the tier)")
 
     out.append("\n## Ban threat, top 5 (any role)")
     out.append(table(
@@ -79,6 +79,6 @@ def results_text(res):
             "%s (%+.2f%% win rate, %s pick rate)" % (e["name"], e["win_rate_delta"], pct(e["pick_rate"]))
             for e in res["excluded_by_pool_rule"]))
     if res["cards_not_ranked"]:
-        out.append("\nCards that did not pass the filters this patch: " + ", ".join(res["cards_not_ranked"]))
+        out.append("\nCards that did not pass the filters this patch: " + ", ".join("%s (%s)" % (c["name"], "; ".join(c["failed"])) for c in res["cards_not_ranked"]))
     return "\n".join(out)
 

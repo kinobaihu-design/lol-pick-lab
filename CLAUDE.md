@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.35**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.36**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -67,7 +67,7 @@ The final site covers 3 roles: bot lane (ADC and APC), support and jungle, built
 - Keep-active: the first workflow step (`scripts/keep_active.sh`) adds an empty commit to `main` if it has had no commits for 30 days, so GitHub never pauses the schedule (it pauses after 60 days without activity). It runs before collection and is allowed to fail without stopping it.
 - Offline checks: `python3 -m unittest discover -s tests`.
 
-## Scoring model v0.35 (bot lane: ADC and APC): the full recipe
+## Scoring model v0.36 (bot lane: ADC and APC): the full recipe
 
 Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs and share the same trait average. Every part is scored 0–100, then weighted. The order of the steps:
 
@@ -83,7 +83,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
    - **OTP rule (for now):** a Diamond+ player is an OTP of a champion when at least 55% of their recent ranked games are on it, and they have at least 50 games on it this season.
    - The tier list shows the number of OTP players and OTP games behind each OTP score.
 5. **Pick Score** = `0.425 × Stats + 0.525 × Comfort + 0.05 × OTP`.
-6. **Tier (v0.35):** each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** = +1.5 spreads or more **and** a win rate at or above the Diamond+ average (otherwise A) · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. **Stats floor:** a win rate 1.5% or more below the Diamond+ average caps the champion at B. The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`). The S and D boundary is confirmed at 1.5 spreads (Oct 11).
+6. **Tier (v0.36): the Pick Score only.** Each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** +1.5 spreads or more · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. There is no stats floor and no win rate condition on S any more. **Win rate warning (display only):** a champion whose win rate is 1.5% or more below the Diamond+ average shows a ⚠ next to its win rate; it never changes the tier (`WIN_RATE_WARNING_DELTA` in `scoring/config.py`). The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`).
 
 **Other lists:**
 - **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at a target mastery: Never played and Below average as if Good; Average and Good one level up. It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Good"). There are two kinds of advice:
@@ -239,12 +239,23 @@ Pasted from the owner; the live brief has the full details.
 - Open question added: recheck the sample-size limits after a few patches.
 - Growth advisor: the Oct 11 test works as intended; keep as is.
 
-## Tier list page (`site/`, Phase 2, slice 1 built Oct 11, 2026)
+## Brief changes v0.36 (model change), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- MODEL v0.36: the tier follows the Pick Score only. Remove the stats floor (no more B cap, no more "*") and the S condition "win rate at or above the Diamond+ average". Tiers: S +1.5 spreads or more, A +0.5 to +1.5, B −0.5 to +0.5, C −1.5 to −0.5, D below −1.5.
+- New: a champion whose win rate is 1.5% or more below the Diamond+ average shows a ⚠ next to its win rate (display only, no effect on the tier).
+- Board: slice 2 also includes a colored mastery badge, column sorting and the "Carded but not ranked" line.
+- Open question added: Vladimir and Mel sit right at the 0.8% pick-rate bar.
+
+## Tier list page (`site/`, Phase 2, slices 1 and 2 built Oct 11, 2026)
 
 - Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
 - It reads only the finished scores file the collector writes (`scores/latest.json` on the `data` branch, fetched from `raw.githubusercontent.com`). It never calls the Riot API and never contains a key; a test scans `site/` for key names and Riot addresses.
 - If the live file can't be reached it shows `site/data/latest.json` (a saved copy) with a visible notice. This copy is only a fallback and goes stale; refresh it by copying a new `scores/latest.json` over it.
-- Slice 1 shows: patch, "Last updated" (the file's `generated` time, with a red warning when older than 13 hours), then one table sorted by Pick Score: rank, champion, tier (own color, `*` = held to B by the stats floor), Pick Score, Comfort, Stats, OTP points, win rate, difference from the Diamond+ average, games (real games, this patch + last patch).
+- Slice 1 shows: patch, "Last updated" (the file's `generated` time, with a red warning when older than 13 hours), then one table sorted by Pick Score: rank, champion, tier (own color), Pick Score, Comfort, Stats, OTP points, win rate, difference from the Diamond+ average, games (real games, this patch + last patch).
+- **Slice 2 (Oct 11)** adds, in the same table: a colored **Mastery** column (outlined pill, strong to weak: Main gold, Good green, Average blue, Below average purple-grey, Never played grey; from `cards.json`); a **sample-size label** under Games (Low / Medium / High by real games, limits in `SAMPLE_SIZE_LIMITS` in `site/settings.js`); the **OTP players and OTP games** under each OTP score; the **⚠** next to a win rate 1.5 points or more below average. **Click a champion** to open its details row: trait badges with their level (High, Mid, Low; absent traits aren't shown), "Data: X% this patch", sample size, pick rate, OTP players, games and OTP win rate vs everyone's. **Click a column title** to sort, click again to reverse; the page always opens sorted by Pick Score (so by tier) and does not remember the sort. Below the table, a **"Carded but not ranked"** line lists each carded champion that failed the filters and why (from `cards_not_ranked` in the scores file, now a list of `{name, failed, ...}`). The scores file also carries `traits`, `main_type`, `kind` and `win_rate_warning` for each ranked champion. The page copes with an older scores file that lacks them.
+- Vercel check (Oct 11): the repository has no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing is published yet.
 - Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
 - Not deployed. Check before pushing to `main` whether Vercel would publish it (no `vercel.json` yet).
 
@@ -264,8 +275,9 @@ Pasted from the owner; the live brief has the full details.
 - [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
 - [ ] Build the bot-lane tier list page in 3 slices (`site/`): Pick Score with Comfort next to it (Pick Score stays the main number), Meta Score, ban suggestions and the Growth advisor, plus games played, a sample-size label by real games (this patch + last patch together: Low 1,000–2,999, Medium 3,000–9,999, High 10,000+; one setting in the code so it can be retuned), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score. PC first (phone only needs to be readable), English only.
   - [x] Slice 1: basic tier table (Oct 11)
-  - [ ] Slice 2: sample-size label, data-freshness label, OTP counts, trait badges, Meta Score
-  - [ ] Slice 3: ban suggestions, Growth advisor, Needs a card, "Carded but not ranked"
+  - [x] Slice 2: colored mastery badge, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
+  - [ ] Slice 2b: Meta Score (the data-only ranking) on the page
+  - [ ] Slice 3: ban suggestions, Growth advisor, Needs a card
 - [ ] Follow Riot's developer rules: legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
 - [ ] Publish on Vercel and share the link with one friend
@@ -285,7 +297,8 @@ Pasted from the owner; the live brief has the full details.
 
 **Decide before or during Phase 2**
 - **Ban list check:** the owner's bans in the last 3 months were Tristana, and they'd also ban Yunara or Jinx. Does the Ban threat ranking put them near the top? (Bans go by data, not by these examples.)
-- **Tier boundaries:** confirmed at ±0.5 / ±1.5 spreads (Oct 11). Still check the stats floor in Phase 2.
+- **Tier boundaries:** confirmed at ±0.5 / ±1.5 spreads (Oct 11). The stats floor was removed in v0.36.
+- **Pick-rate bar:** Vladimir and Mel sit right at the 0.8% bar (0.82% and 0.81% on patch 16.20), so they may drop in and out of the ranking from patch to patch. Decide in Phase 2 whether that is fine.
 - Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
 - **Are Pick Scores spread enough?** Comfort for the owner's pool sits mostly between 86 and 100, so Stats should do most of the separating. Check with real data and widen the gaps if the tiers feel too similar.
 - Review all cards' traits with the "at least Low" rule (only Lucian is done so far), and fill in mastery and difficulty for any remaining draft cards.
@@ -317,6 +330,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.36** (Oct 11, 2026): the tier follows the Pick Score only. Stats floor removed (no more B cap, no more "*") and the S condition "win rate at or above the Diamond+ average" removed. Tiers: S +1.5 spreads or more, A +0.5 to +1.5, B −0.5 to +0.5, C −1.5 to −0.5, D below −1.5. New display-only ⚠ next to a win rate 1.5% or more below the Diamond+ average. On patch 16.20 data only Caitlyn changes tier (B* → A).
 - **v0.35** (Oct 11, 2026): weights Stats 42.5% / Comfort 52.5% / OTP 5%. Pick rate defined as the champion's bot-lane games ÷ all games (same numbers as before); pick-rate filter lowered from 1% to 0.8%. Tiers by spreads from the patch's average Pick Score (S +1.5 and win rate at or above average, A +0.5, B −0.5, C −1.5); stats floor kept; boundaries in config. Growth advisor only for champions with a card; new "Needs a card" list. Ban threat shows each champion's role. Yasuo and Katarina stay excluded.
 - **v0.34** (Oct 11, 2026): the 1,000-game filter counts this patch and last patch together, so the tier list stays full early in a patch (lane share and pick rate use the same blended numbers; the data-freshness label shows how much is this patch). Meta Score defined = Stats points alone. Build recommendations dropped from the goals (maybe later). Roles built in order bot lane → support → jungle.
 - **v0.33** (Oct 3, 2026): PBI removed, so Stats = 75% win rate points + 25% pick rate. Bans by data only: Ban threat = (win rate − Diamond+ average) × pick rate. Growth advisor rule (Never played and Below average → as if Good; Average and Good → one level up; shown if it beats the #3 pick). The final site covers bot lane, jungle and support.

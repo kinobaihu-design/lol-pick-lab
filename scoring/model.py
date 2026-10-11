@@ -1,4 +1,4 @@
-"""The scoring model, step by step as in the brief (v0.35).
+"""The scoring model, step by step as in the brief (v0.36).
 
 Reads the files the collector saves (see the README on the `data` branch) and returns
 one dictionary with everything the website will need.
@@ -94,35 +94,17 @@ def spreads_from_average(score, mean, sd):
     return 0.0 if not sd else round((score - mean) / sd, 2)
 
 
-def tier_of(spreads, win_rate_delta=None, boundaries=None):
-    """Tier from the spreads, then S needs a win rate at or above the Diamond+ average
-    (otherwise A), then the stats floor: a win rate 1.5% or more below the average caps it at B.
-    `boundaries` is a list like config.TIER_BOUNDARIES (the comparison table tries others)."""
-    tier = "D"
-    for name, lowest in (boundaries or config.TIER_BOUNDARIES):
+def tier_of(spreads):
+    """Tier from the spreads alone (model v0.36): S 1.5+, A 0.5+, B -0.5+, C -1.5+, else D."""
+    for name, lowest in config.TIER_BOUNDARIES:
         if spreads >= lowest:
-            if name == "S" and win_rate_delta is not None and win_rate_delta < config.S_MIN_WIN_RATE_DELTA:
-                continue
-            tier = name
-            break
-    capped = False
-    if win_rate_delta is not None and win_rate_delta <= config.STATS_FLOOR:
-        if config.TIER_RANK[tier] < config.TIER_RANK[config.STATS_FLOOR_TIER]:
-            tier, capped = config.STATS_FLOOR_TIER, True
-    return tier, capped
+            return name
+    return "D"
 
 
-def old_fixed_tier_of(score, win_rate_delta=None):
-    """The v0.34 tiers (fixed Pick Score cutoffs). Only for the comparison table."""
-    tier = "D"
-    for name, cutoff in config.OLD_FIXED_CUTOFFS:
-        if round(score, 1) >= cutoff:
-            tier = name
-            break
-    if win_rate_delta is not None and win_rate_delta <= config.STATS_FLOOR:
-        if config.TIER_RANK[tier] < config.TIER_RANK[config.STATS_FLOOR_TIER]:
-            tier = config.STATS_FLOOR_TIER
-    return tier
+def win_rate_warning(win_rate_delta):
+    """True when the win rate is 1.5% or more below the Diamond+ average (display only)."""
+    return win_rate_delta <= config.WIN_RATE_WARNING_DELTA
 
 
 ROLE_NAMES = {"BOTTOM": "ADC / bot lane", "UTILITY": "Support", "JUNGLE": "Jungle", "MIDDLE": "Mid", "TOP": "Top"}
@@ -257,6 +239,18 @@ def lane_candidates(current, previous):
             "bot_wins_raw": (cur["real_wins"] if cur else 0) + (prev["real_wins"] if prev else 0),
         }
     return out
+
+
+def failed_filters(c):
+    """The reasons a champion misses the ranking, in plain words (empty when it passes)."""
+    reasons = []
+    if c["real_games"] < config.MIN_REAL_GAMES:
+        reasons.append("under %d real games" % config.MIN_REAL_GAMES)
+    if c["lane_share"] is None or c["lane_share"] < config.MIN_LANE_SHARE:
+        reasons.append("bot-lane share under %g%%" % (100 * config.MIN_LANE_SHARE))
+    if c["pick_rate"] is None or c["pick_rate"] < config.MIN_PICK_RATE:
+        reasons.append("bot-lane pick rate under %g%%" % (100 * config.MIN_PICK_RATE))
+    return reasons
 
 
 def passes_filters(c):
@@ -425,6 +419,9 @@ def score_all(root, cards=None, now=None):
         v["comfort_parts"] = parts
         v["comfort"] = parts["comfort"]
         v["mastery"] = card["mastery"]
+        v["traits"] = card.get("traits", {})
+        v["main_type"] = card.get("main_type")
+        v["kind"] = card.get("kind")
         v["pick_score"] = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * v["comfort"]
                            + config.WEIGHT_OTP * v["otp_points"])
 
@@ -437,7 +434,8 @@ def score_all(root, cards=None, now=None):
                   "boundaries": {name: lowest for name, lowest in config.TIER_BOUNDARIES}}
     for v in pick_list:
         v["spreads"] = spreads_from_average(v["pick_score"], tier_stats["average_pick_score"], tier_stats["spread"])
-        v["tier"], v["tier_capped_by_floor"] = tier_of(v["spreads"], v["win_rate_delta"])
+        v["tier"] = tier_of(v["spreads"])
+        v["win_rate_warning"] = win_rate_warning(v["win_rate_delta"])
     for i, v in enumerate(pick_list, 1):
         v["pick_rank"] = i
     meta_list = sorted(eligible.values(), key=lambda v: -v["meta_score"])
@@ -460,8 +458,8 @@ def score_all(root, cards=None, now=None):
             "otp_raw_points", "otp_reliability", "otp_points") if k in v}
         out["data_label"] = "Data: %d%% this patch" % round(100 * v["this_patch_share"])
         if v["has_card"]:
-            out.update({k: v[k] for k in ("mastery", "comfort", "comfort_parts", "pick_score", "pick_rank",
-                                          "spreads", "tier", "tier_capped_by_floor")})
+            out.update({k: v[k] for k in ("mastery", "traits", "main_type", "kind", "comfort", "comfort_parts", "pick_score", "pick_rank",
+                                          "spreads", "tier", "win_rate_warning")})
         else:
             out["label"] = "no card yet"
         return out
@@ -470,19 +468,20 @@ def score_all(root, cards=None, now=None):
     for k, v in lane.items():
         if k in eligible:
             continue
-        reasons = []
-        if v["real_games"] < config.MIN_REAL_GAMES:
-            reasons.append("under %d real games" % config.MIN_REAL_GAMES)
-        if v["lane_share"] is None or v["lane_share"] < config.MIN_LANE_SHARE:
-            reasons.append("lane share under %d%%" % round(100 * config.MIN_LANE_SHARE))
-        if v["pick_rate"] is None or v["pick_rate"] < config.MIN_PICK_RATE:
-            reasons.append("pick rate under %g%%" % (100 * config.MIN_PICK_RATE))
+        reasons = failed_filters(v)
         if v["real_games"] >= 300:
             why_out[k] = {"name": display_name(v["riot_name"]), "real_games": v["real_games"],
                           "lane_share": v["lane_share"], "pick_rate": v["pick_rate"], "failed": reasons}
 
-    cards_not_ranked = [c["name"] for k, c in by_name.items()
-                        if c["name"] not in {v["name"] for v in eligible.values() if v["has_card"]}]
+    ranked_names = {v["name"] for v in eligible.values() if v["has_card"]}
+    cards_not_ranked = []
+    for key, card in by_name.items():
+        if card["name"] in ranked_names:
+            continue
+        cand = next((v for v in lane.values() if normalise(v["riot_name"]) == key), None)
+        cards_not_ranked.append({"name": card["name"], "real_games": cand["real_games"] if cand else 0,
+                                 "pick_rate": cand["pick_rate"] if cand else None,
+                                 "failed": failed_filters(cand) if cand else ["no bot-lane games found"]})
 
     return {
         "model_version": config.MODEL_VERSION,
@@ -497,7 +496,7 @@ def score_all(root, cards=None, now=None):
         "eligible_champions": len(eligible),
         "champions_with_card": len(pick_list),
         "champions_without_card": len(eligible) - len(pick_list),
-        "cards_not_ranked": sorted(cards_not_ranked),
+        "cards_not_ranked": sorted(cards_not_ranked, key=lambda row: row["name"]),
         "pick_score_list": [clean(v) for v in pick_list],
         "meta_score_list": [clean(v) for v in meta_list],
         "needs_a_card": [clean(v) for v in meta_list if not v["has_card"]],
@@ -539,8 +538,7 @@ def growth_advisor(eligible, carded, pick_list, trait_average, tier_stats):
             continue
         others = [s for cid, s in scores.items() if cid != v["id"]]
         rank = 1 + sum(1 for s in others if s > after)
-        tier, _ = tier_of(spreads_from_average(after, tier_stats["average_pick_score"], tier_stats["spread"]),
-                          v["win_rate_delta"])
+        tier = tier_of(spreads_from_average(after, tier_stats["average_pick_score"], tier_stats["spread"]))
         suggestions.append({
             "id": v["id"], "name": v["name"], "kind": kind,
             "current_mastery": current_mastery, "target_mastery": target,
