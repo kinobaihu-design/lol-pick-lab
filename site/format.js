@@ -101,11 +101,16 @@
     return Number(champ.win_rate_delta) <= limit;
   }
 
+  // What the OTP numbers count: the one-tricks' BOT-LANE games on the champion (the rule that makes
+  // someone a one-trick looks at all roles, so they may have many more games on it elsewhere).
   function otpText(champ) {
     var players = champ.otp_players || 0, games = champ.otp_games || 0;
-    if (!games) return "no OTP games yet";
-    return players + (players === 1 ? " OTP player" : " OTP players") + ", " +
-      Math.round(games).toLocaleString("en-US") + (games === 1 ? " OTP game" : " OTP games");
+    var text = players + (players === 1 ? " OTP player" : " OTP players") + ", " +
+      Math.round(games).toLocaleString("en-US") + (games === 1 ? " bot-lane game" : " bot-lane games");
+    if (champ.otp_games_all_roles) {
+      text += " (" + Math.round(champ.otp_games_all_roles).toLocaleString("en-US") + " games on it in all roles)";
+    }
+    return text;
   }
 
   // One text for a card that missed the filters: "Senna: bot-lane pick rate under 0.8%".

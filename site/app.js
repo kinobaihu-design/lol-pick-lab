@@ -1,6 +1,6 @@
 // Loads the scores file and draws the tier table. Reads only; it never talks to Riot.
 (function () {
-  var F = window.Format, S = window.SETTINGS;
+  var F = window.Format, S = window.SETTINGS, H = window.HELP;
 
   function el(tag, className, text) {
     var node = document.createElement(tag);
@@ -141,7 +141,7 @@
 
       var otpCell = cell(tr, F.number(c.otp_points, 1), "num");
       otpCell.title = F.otpText(c);
-      otpCell.appendChild(el("span", "sub", (c.otp_players || 0) + " players, " + F.games(c.otp_games || 0) + " games"));
+      otpCell.appendChild(el("span", "sub", (c.otp_players || 0) + " players, " + F.games(c.otp_games || 0) + " bot-lane games"));
 
       var wrCell = cell(tr, F.number(c.win_rate, 2) + "%", "num");
       if (F.hasWinRateWarning(c, S.WIN_RATE_WARNING_DELTA)) {
@@ -172,6 +172,8 @@
   function wireHeaders() {
     Array.prototype.forEach.call(document.querySelectorAll("th[data-sort]"), function (th) {
       th.tabIndex = 0;
+      var tip = H[th.getAttribute("data-sort")];
+      if (tip) th.title = tip;
       function go() {
         var key = th.getAttribute("data-sort");
         if (state.key === key) state.dir = state.dir === "asc" ? "desc" : "asc";

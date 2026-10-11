@@ -263,7 +263,8 @@ def passes_filters(c):
 
 
 def otp_numbers(root, patches, eligible_ids):
-    """For each eligible champion: OTP players, their bot-lane games and wins.
+    """For each eligible champion: OTP players, their bot-lane games and wins (and, for display only,
+    their games on it in every role).
 
     OTP rule: at least 55% of a player's recent ranked games (this patch + last patch,
     all champions and roles) are on the champion, and at least 50 games on it this
@@ -292,7 +293,7 @@ def otp_numbers(root, patches, eligible_ids):
     season_path = os.path.join(root, "season", season_name, "players.json.gz")
     season = read_json(season_path)["players"] if os.path.exists(season_path) else {}
 
-    result = {c: {"players": 0, "games": 0, "wins": 0} for c in wanted}
+    result = {c: {"players": 0, "games": 0, "wins": 0, "all_role_games": 0} for c in wanted}
     for code, (total, champs) in per_player.items():
         if not total:
             continue
@@ -306,6 +307,7 @@ def otp_numbers(root, patches, eligible_ids):
             out["players"] += 1
             out["games"] += row[2]
             out["wins"] += row[3]
+            out["all_role_games"] += row[0]   # display only: games on it in every role
     return result
 
 
@@ -385,6 +387,7 @@ def score_all(root, cards=None, now=None):
     for k, v in eligible.items():
         o = otp[k]
         v["otp_players"], v["otp_games"] = o["players"], o["games"]
+        v["otp_games_all_roles"] = o["all_role_games"]
         if o["games"] > 0 and v["bot_games_raw"] > 0:
             v["otp_win_rate"] = 100.0 * o["wins"] / o["games"]
             v["overall_win_rate_raw"] = 100.0 * v["bot_wins_raw"] / v["bot_games_raw"]
@@ -454,7 +457,7 @@ def score_all(root, cards=None, now=None):
             "id", "riot_name", "name", "has_card", "real_games", "real_games_this_patch", "real_games_last_patch",
             "this_patch_share", "win_rate", "win_rate_delta", "pick_rate", "lane_share",
             "win_rate_points", "pick_rate_points", "stats", "meta_score", "meta_rank",
-            "otp_players", "otp_games", "otp_win_rate", "overall_win_rate_raw", "otp_delta",
+            "otp_players", "otp_games", "otp_games_all_roles", "otp_win_rate", "overall_win_rate_raw", "otp_delta",
             "otp_raw_points", "otp_reliability", "otp_points") if k in v}
         out["data_label"] = "Data: %d%% this patch" % round(100 * v["this_patch_share"])
         if v["has_card"]:

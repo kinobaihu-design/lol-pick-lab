@@ -96,9 +96,10 @@ test("win rate warning: from the file, or from the limit", () => {
 });
 
 test("OTP text and not-ranked text", () => {
-  assert.strictEqual(F.otpText({ otp_players: 10, otp_games: 617 }), "10 OTP players, 617 OTP games");
-  assert.strictEqual(F.otpText({ otp_players: 1, otp_games: 1 }), "1 OTP player, 1 OTP game");
-  assert.strictEqual(F.otpText({ otp_players: 0, otp_games: 0 }), "no OTP games yet");
+  assert.strictEqual(F.otpText({ otp_players: 10, otp_games: 617 }), "10 OTP players, 617 bot-lane games");
+  assert.strictEqual(F.otpText({ otp_players: 1, otp_games: 1 }), "1 OTP player, 1 bot-lane game");
+  assert.strictEqual(F.otpText({ otp_players: 2, otp_games: 2, otp_games_all_roles: 120 }),
+    "2 OTP players, 2 bot-lane games (120 games on it in all roles)");
   assert.strictEqual(F.notRankedText({ name: "Senna", failed: ["bot-lane pick rate under 0.8%"] }),
     "Senna: bot-lane pick rate under 0.8%");
   assert.strictEqual(F.notRankedText({ name: "Akshan", failed: ["a", "b"] }), "Akshan: a; b");

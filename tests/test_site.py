@@ -5,12 +5,17 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(ROOT, "site")
-SITE_FILES = ["index.html", "style.css", "app.js", "format.js", "settings.js", "data/latest.json"]
+SITE_FILES = ["index.html", "style.css", "app.js", "format.js", "help.js", "settings.js", "data/latest.json"]
 COLUMNS = ["rank", "champion", "tier", "Pick Score", "Comfort", "Stats", "OTP", "Win rate", "vs average", "Games"]
+
+
+sys.path.insert(0, ROOT)
+from scoring import config   # noqa: E402
 
 
 def read(name):
@@ -36,7 +41,7 @@ class SiteFilesTests(unittest.TestCase):
         html = read("index.html")
         self.assertIn('<html lang="en">', html)
         scripts = re.findall(r'<script src="([^"]+)"', html)
-        self.assertEqual(scripts, ["settings.js", "format.js", "app.js"])
+        self.assertEqual(scripts, ["settings.js", "format.js", "help.js", "app.js"])
         self.assertNotIn("http", " ".join(scripts))      # no outside scripts
 
     def test_every_tier_has_its_own_color(self):
@@ -67,6 +72,64 @@ class SiteFilesTests(unittest.TestCase):
     def test_sample_size_limits_are_in_settings(self):
         text = read("settings.js")
         self.assertRegex(text, r"SAMPLE_SIZE_LIMITS:\s*\{\s*low:\s*1000,\s*medium:\s*3000,\s*high:\s*10000\s*\}")
+
+
+def help_texts():
+    """The hover texts in site/help.js, as {column key: text}. Symbols are written as plain characters."""
+    found = re.findall(r'^\s{4}(\w+):\s*"((?:[^"\\]|\\.)*)"', read("help.js"), re.M)
+    return {key: text for key, text in found}
+
+
+def num(text):
+    return float(text.replace(",", ""))
+
+
+class HoverHelpTests(unittest.TestCase):
+    def setUp(self):
+        self.help = help_texts()
+
+    def test_every_column_title_has_a_short_text(self):
+        keys = re.findall(r'<th[^>]*data-sort="([^"]+)"', read("index.html"))
+        for key in keys:
+            self.assertIn(key, self.help, key)
+            self.assertGreater(len(self.help[key]), 20, key)
+            self.assertLess(len(self.help[key]), 330, key)          # 1-2 plain lines
+
+    def test_pick_score_weights_match_the_scoring_code(self):
+        t = self.help["pick_score"]
+        got = [float(x) for x in re.findall(r"([\d.]+) \u00d7 (?:Stats|Comfort|OTP)", t)]
+        self.assertEqual(got, [config.WEIGHT_STATS, config.WEIGHT_COMFORT, config.WEIGHT_OTP])
+        percents = [float(x) for x in re.findall(r"([\d.]+)%", t)]
+        self.assertEqual(percents, [round(100 * w, 1) for w in (config.WEIGHT_STATS, config.WEIGHT_COMFORT, config.WEIGHT_OTP)])
+
+    def test_weights_in_the_other_texts_match_too(self):
+        pct = lambda w: "%g%%" % round(100 * w, 1)
+        self.assertIn("Worth " + pct(config.WEIGHT_COMFORT) + " of the Pick Score", self.help["comfort"])
+        self.assertIn("Worth " + pct(config.WEIGHT_STATS) + " of the Pick Score", self.help["stats"])
+        self.assertIn("Worth " + pct(config.WEIGHT_OTP) + " of the Pick Score", self.help["otp"])
+        self.assertIn("%s win rate points and %s pick rate" % (pct(config.STATS_WIN_RATE_SHARE), pct(config.STATS_PICK_RATE_SHARE)),
+                      self.help["stats"])
+        self.assertIn("(%s of Stats)" % pct(config.STATS_WIN_RATE_SHARE), self.help["win_rate"])
+        self.assertIn("moves the win rate points in Stats by %g" % config.WIN_RATE_POINTS_PER_PERCENT, self.help["vs_average"])
+
+    def test_tier_cutoffs_and_warning_match_the_scoring_code(self):
+        t = self.help["tier"]
+        b = dict(config.TIER_BOUNDARIES)
+        self.assertIn("S +%g or more" % b["S"], t)
+        self.assertIn("A +%g to +%g" % (b["A"], b["S"]), t)
+        self.assertIn("B -%g to +%g" % (-b["B"], b["A"]), t)
+        self.assertIn("C -%g to -%g" % (-b["C"], -b["B"]), t)
+        self.assertIn("D below -%g" % -b["C"], t)
+        self.assertIn("%g points or more below" % -config.WIN_RATE_WARNING_DELTA, self.help["win_rate"])
+
+    def test_sample_size_limits_match_settings(self):
+        limits = [int(x) for x in re.findall(r"(\d+)", re.search(r"SAMPLE_SIZE_LIMITS:\s*\{(.*?)\}", read("settings.js")).group(1))]
+        low, medium, high = limits
+        t = self.help["games"]
+        self.assertIn("Low {:,}\u2013{:,}".format(low, medium - 1), t)
+        self.assertIn("Medium {:,}\u2013{:,}".format(medium, high - 1), t)
+        self.assertIn("High {:,}+".format(high), t)
+        self.assertIn("needs {:,} to be ranked".format(config.MIN_REAL_GAMES), t)
 
 
 class SiteSafetyTests(unittest.TestCase):

@@ -248,13 +248,21 @@ Pasted from the owner; the live brief has the full details.
 - Board: slice 2 also includes a colored mastery badge, column sorting and the "Carded but not ranked" line.
 - Open question added: Vladimir and Mel sit right at the 0.8% pick-rate bar.
 
-## Tier list page (`site/`, Phase 2, slices 1 and 2 built Oct 11, 2026)
+## Brief changes v0.36, second block (no model change), Oct 11, 2026
+
+- Board, tier list page: slice 2 done; mastery shown as 1–5 colored dots under Comfort. New: column titles show a short explanation on hover (what the number means and its weight in the Pick Score); the texts live in one file (`site/help.js`) and get updated with every model version.
+- Open question added: sorting by mastery was removed with the dots; maybe a mastery filter later.
+
+## Tier list page (`site/', Phase 2, slices 1 and 2 built Oct 11, 2026)
 
 - Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
 - It reads only the finished scores file the collector writes (`scores/latest.json` on the `data` branch, fetched from `raw.githubusercontent.com`). It never calls the Riot API and never contains a key; a test scans `site/` for key names and Riot addresses.
 - If the live file can't be reached it shows `site/data/latest.json` (a saved copy) with a visible notice. This copy is only a fallback and goes stale; refresh it by copying a new `scores/latest.json` over it.
 - Slice 1 shows: patch, "Last updated" (the file's `generated` time, with a red warning when older than 13 hours), then one table sorted by Pick Score: rank, champion, tier (own color), Pick Score, Comfort, Stats, OTP points, win rate, difference from the Diamond+ average, games (real games, this patch + last patch).
 - **Slice 2 (Oct 11)** adds, in the same table: a colored **Mastery** column (outlined pill, strong to weak: Main gold, Good green, Average blue, Below average purple-grey, Never played grey; from `cards.json`); a **sample-size label** under Games (Low / Medium / High by real games, limits in `SAMPLE_SIZE_LIMITS` in `site/settings.js`); the **OTP players and OTP games** under each OTP score; the **⚠** next to a win rate 1.5 points or more below average. **Click a champion** to open its details row: trait badges with their level (High, Mid, Low; absent traits aren't shown), "Data: X% this patch", sample size, pick rate, OTP players, games and OTP win rate vs everyone's. **Click a column title** to sort, click again to reverse; the page always opens sorted by Pick Score (so by tier) and does not remember the sort. Below the table, a **"Carded but not ranked"** line lists each carded champion that failed the filters and why (from `cards_not_ranked` in the scores file, now a list of `{name, failed, ...}`). The scores file also carries `traits`, `main_type`, `kind` and `win_rate_warning` for each ranked champion. The page copes with an older scores file that lacks them.
+- **Hover help on column titles:** every column title shows 1–2 plain lines (what the number means and its weight in the Pick Score). All the texts live in `site/help.js`; update them with every model version. `tests/test_site.py` fails if the weights, tier cutoffs, ⚠ limit, win-rate points per point or sample-size limits written in the texts differ from `scoring/config.py` and `site/settings.js`.
+- **Mastery** is shown as 5 small dots under the Comfort score (more filled = better, colored by level); the Mastery column and its sorting were removed.
+- **What "OTP games" counts:** the one-tricks' *bot-lane* games on the champion, this patch and last patch. The OTP rule itself (55% of recent games, 50+ this season) looks at all roles, so a champion mostly played elsewhere (Mel, mostly mid) can have OTP players with only a few bot-lane games. The page now says "bot-lane games" and shows the all-role games too (`otp_games_all_roles`, display only; the scores didn't change).
 - Vercel check (Oct 11): the repository has no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing is published yet.
 - Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
 - Not deployed. Check before pushing to `main` whether Vercel would publish it (no `vercel.json` yet).
@@ -275,9 +283,8 @@ Pasted from the owner; the live brief has the full details.
 - [ ] Fill in a champion card (type, traits, mastery, difficulty, note) for every ADC the owner plays
 - [ ] Build the bot-lane tier list page in 3 slices (`site/`): Pick Score with Comfort next to it (Pick Score stays the main number), Meta Score, ban suggestions and the Growth advisor, plus games played, a sample-size label by real games (this patch + last patch together: Low 1,000–2,999, Medium 3,000–9,999, High 10,000+; one setting in the code so it can be retuned), a data-freshness label ("Data: 75% this patch") and trait badges for every champion, plus the number of OTP players and OTP games behind each OTP score. PC first (phone only needs to be readable), English only.
   - [x] Slice 1: basic tier table (Oct 11)
-  - [x] Slice 2: colored mastery badge, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
-  - [ ] Slice 2b: Meta Score (the data-only ranking) on the page
-  - [ ] Slice 3: ban suggestions, Growth advisor, Needs a card
+  - [x] Slice 2: mastery shown as 1–5 colored dots under Comfort, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
+  - [ ] Slice 3: Meta Score, ban suggestions, Growth advisor, Needs a card
 - [ ] Follow Riot's developer rules: legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
 - [ ] Publish on Vercel and share the link with one friend
@@ -298,6 +305,7 @@ Pasted from the owner; the live brief has the full details.
 **Decide before or during Phase 2**
 - **Ban list check:** the owner's bans in the last 3 months were Tristana, and they'd also ban Yunara or Jinx. Does the Ban threat ranking put them near the top? (Bans go by data, not by these examples.)
 - **Tier boundaries:** confirmed at ±0.5 / ±1.5 spreads (Oct 11). The stats floor was removed in v0.36.
+- **Mastery filter:** sorting by mastery was removed with the dots; maybe add a mastery filter later.
 - **Pick-rate bar:** Vladimir and Mel sit right at the 0.8% bar (0.82% and 0.81% on patch 16.20), so they may drop in and out of the ranking from patch to patch. Decide in Phase 2 whether that is fine.
 - Tune the kit weight (0.9) and difficulty weight (3) in Phase 2. Their caps stay ±2.5 and ±1.5 on the Pick Score.
 - **Are Pick Scores spread enough?** Comfort for the owner's pool sits mostly between 86 and 100, so Stats should do most of the separating. Check with real data and widen the gaps if the tiers feel too similar.
