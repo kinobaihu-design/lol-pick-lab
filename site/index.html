@@ -171,8 +171,35 @@
       </div>
       <p id="next-empty" class="intro" hidden></p>
       <p id="next-old" class="notice warn" hidden>This scores file is from before this list existed; it appears after the next collector run.</p>
+
+      <section class="utopy">
+        <h2 class="sectionhead" data-tip-key="utopy">Utopy picks</h2>
+        <p class="intro">Long-term goals, information only</p>
+        <div class="tablewrap" id="utopy-wrap">
+          <table id="utopy-table">
+            <thead>
+              <tr>
+                <th data-sort="u_champion">Champion</th>
+                <th data-sort="u_mastery">Mastery now</th>
+                <th data-sort="u_level">First level in S</th>
+                <th class="num" data-sort="u_steps">Steps away</th>
+                <th class="num" data-sort="u_score">Pick Score</th>
+                <th data-sort="u_skill">Skill pays off?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="utopy-empty" class="intro" hidden></p>
+        <p id="utopy-old" class="notice warn" hidden>This scores file is from before this list existed; it appears after the next collector run.</p>
+        <p id="utopy-basis" class="intro"></p>
+      </section>
     </section>
   </div>
+  <footer id="site-footer" class="sitefooter">
+    <p id="legal-notice">LoL Pick Lab is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
+    <p id="about-line" class="about">LoL Pick Lab is a free personal project for me and my friends: no ads, no payments, no data sold. The stats are combined from many Diamond+ ranked games and never show individual players.</p>
+  </footer>
 <div id="tip" role="tooltip" hidden></div>
 </main>
 <script src="settings.js"></script>

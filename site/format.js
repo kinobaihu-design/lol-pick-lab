@@ -307,6 +307,27 @@
     return "None this patch \u00b7 closest: " + closest.name + ", " + number(closest.points_short, 1) + " points short";
   }
 
+  // ---- Utopy picks (v0.40): long-term goals, information only ----
+  function stepsText(n) { return n + (n === 1 ? " step" : " steps"); }
+
+  // "68.0 \u2192 78.5 at Main", or "68.0 \u2192 74.1 at Good \u00b7 78.5 at Main" when both levels reach S.
+  function utopyScoresText(row) {
+    return number(row.pick_score_now, 1) + " \u2192 " + row.scores.map(function (s) {
+      return number(s.score, 1) + " at " + masteryText(s.level);
+    }).join(" \u00b7 ");
+  }
+
+  // The compact skill line, or "too few games" (below the minimum bot-lane OTP games).
+  function utopySkillText(champ, minGames) {
+    return skillPaysOffText(champ, minGames) || "too few games";
+  }
+
+  // The one line shown when "Utopy picks" is empty.
+  function utopyClosestText(closest) {
+    if (!closest) return "None this patch";
+    return "None this patch \u00b7 closest: " + closest.name + ", " + number(closest.points_short, 1) + " points short of S at Main";
+  }
+
   // Hover text on a name in the Tier list for a champion that can't reach A even at Main.
   function bestReachText(champ) {
     if (!champ.best_tier_at_main || champ.best_tier_at_main === "A" || champ.best_tier_at_main === "S") return "";
@@ -370,6 +391,14 @@
     g_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
   };
 
+  var UTOPY_COLUMNS = {
+    u_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
+    u_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
+    u_level:  { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.first_level); } },
+    u_steps:  { first: "asc", value: function (t) { return t.steps; } },
+    u_score:  { first: "desc", value: function (t) { return t.scores[t.scores.length - 1].score; } },
+    u_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
+  };
   var NEXT_COLUMNS = {
     n_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
     n_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
@@ -415,7 +444,8 @@
               masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
               sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS,
-              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, NEXT_COLUMNS: NEXT_COLUMNS,
+              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, NEXT_COLUMNS: NEXT_COLUMNS, UTOPY_COLUMNS: UTOPY_COLUMNS,
+              stepsText: stepsText, utopyScoresText: utopyScoresText, utopySkillText: utopySkillText, utopyClosestText: utopyClosestText,
               normalise: normalise, cardInfo: cardInfo, applyCards: applyCards, meanAndSpread: meanAndSpread,
               spreadStep: spreadStep, stepClass: stepClass, patchMix: patchMix, patchMixText: patchMixText,
               bestReachText: bestReachText, ceilingText: ceilingText, closestText: closestText,

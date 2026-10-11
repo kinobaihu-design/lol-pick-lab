@@ -1,6 +1,7 @@
 """Checks for the tier list page (site/): files, settings, safety and the data it reads."""
 
 import json
+import html.parser
 import os
 import re
 import shutil
@@ -28,6 +29,71 @@ def table_html(table_id):
     match = re.search(r'<table id="%s">(.*?)</table>' % table_id, read("index.html"), re.S)
     assert match, table_id
     return match.group(1)
+
+
+RIOT_NOTICE = ("LoL Pick Lab is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games "
+               "or anyone officially involved in producing or managing Riot Games properties. Riot Games and all "
+               "associated properties are trademarks or registered trademarks of Riot Games, Inc")
+
+
+class _Tree(html.parser.HTMLParser):
+    """Remembers, for the legal notice paragraph, every ancestor tag with its attributes."""
+
+    VOID = {"meta", "link", "br", "img", "input", "hr"}
+
+    def __init__(self):
+        super().__init__()
+        self.stack, self.ancestors, self.text, self._in = [], None, "", False
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if attrs.get("id") == "legal-notice":
+            self.ancestors, self._in = list(self.stack), True
+        if tag not in self.VOID:
+            self.stack.append((tag, attrs))
+
+    def handle_endtag(self, tag):
+        if tag in self.VOID:
+            return
+        if self.stack and self.stack[-1][1].get("id") == "legal-notice":
+            self._in = False
+        while self.stack and self.stack.pop()[0] != tag:
+            pass
+
+    def handle_data(self, data):
+        if self._in:
+            self.text += data
+
+
+class LegalNoticeTests(unittest.TestCase):
+    """Riot's rule: the legal notice must be readily visible to players, on every tab."""
+
+    def test_notice_has_riots_exact_wording_with_our_product_name(self):
+        tree = _Tree()
+        tree.feed(read("index.html"))
+        self.assertIsNotNone(tree.ancestors, "legal notice (id=legal-notice) is missing from the page")
+        self.assertIn(RIOT_NOTICE, " ".join(tree.text.split()))
+
+    def test_notice_is_outside_every_tab_and_never_hidden(self):
+        tree = _Tree()
+        tree.feed(read("index.html"))
+        self.assertIsNotNone(tree.ancestors)
+        for tag, attrs in tree.ancestors:
+            self.assertNotIn("hidden", attrs, "the notice sits inside a hidden element")
+            self.assertNotEqual(attrs.get("role"), "tabpanel", "the notice sits inside one tab only")
+            self.assertNotIn("tabpanel", attrs.get("class", ""))
+            self.assertNotEqual(attrs.get("id"), "content", "the notice would stay hidden until the scores load")
+        self.assertEqual(len(re.findall(r'role="tab"', read("index.html"))), 4)   # the 4 tabs it must show under
+        code = read("app.js")
+        for word in ("legal-notice", "site-footer", "about-line"):
+            self.assertNotIn(word, code)                          # the page code never hides or removes it
+        self.assertNotRegex(read("style.css"), r"(sitefooter|#legal-notice)[^}]*display:\s*none")
+
+    def test_about_line_is_in_the_footer(self):
+        text = " ".join(re.sub(r"<[^>]+>", " ", read("index.html")).split())
+        for phrase in ("free personal project", "no ads", "no payments", "no data sold",
+                       "never show individual players", "Diamond+ ranked games"):
+            self.assertIn(phrase, text)
 
 
 class SiteFilesTests(unittest.TestCase):
@@ -71,7 +137,7 @@ class SiteFilesTests(unittest.TestCase):
         source = read("format.js")
         sets = {"tier-table": "SORT_COLUMNS", "meta-table": "META_COLUMNS", "needs-table": "META_COLUMNS",
                 "comfort-table": "COMFORT_COLUMNS", "growth-table": "GROWTH_COLUMNS",
-                "next-table": "NEXT_COLUMNS"}
+                "next-table": "NEXT_COLUMNS", "utopy-table": "UTOPY_COLUMNS"}
         for table, name in sets.items():
             block = re.search(r"var %s = \{(.*?)\n  \};" % name, source, re.S).group(1)
             keys = re.findall(r'data-sort="([^"]+)"', table_html(table))
@@ -343,6 +409,56 @@ class SiteDataTests(unittest.TestCase):
         else:
             self.assertGreater(self.data["next_step_closest"]["points_short"], 0)
 
+    def test_utopy_list_matches_a_fresh_calculation_and_the_other_lists_do_not_depend_on_it(self):
+        """Who is listed, the first level that reaches S, the steps and the scores all recompute from the saved numbers."""
+        cards = self.cards_by_name()
+        tiers = self.data["tier_stats"]
+        mean, spread = tiers["average_pick_score"], tiers["spread"]
+        order = config.MASTERY_ORDER
+        expected = {}
+        for row in self.data["pick_score_list"]:
+            if row["mastery"] == "main" or row["tier"] == "S":
+                continue
+            card = cards[model.normalise(row["riot_name"])]
+            hits = []
+            for level in ("good", "main"):
+                if order.index(level) <= order.index(row["mastery"]):
+                    continue
+                c = comfort.comfort(card, self.data["trait_average"], level)["comfort"]
+                score = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * c + config.WEIGHT_OTP * row["otp_points"]
+                if model.tier_of(model.spreads_from_average(score, mean, spread)) == "S":
+                    hits.append((level, score))
+            if hits:
+                expected[row["id"]] = (hits, order.index(hits[0][0]) - order.index(row["mastery"]))
+        listed = {r["id"]: r for r in self.data["utopy_list"]}
+        self.assertEqual(set(listed), set(expected))
+        for cid, (hits, steps) in expected.items():
+            r = listed[cid]
+            self.assertEqual([s["level"] for s in r["scores"]], [h[0] for h in hits])
+            self.assertEqual((r["first_level"], r["steps"]), (hits[0][0], steps))
+            for got, (_, score) in zip(r["scores"], hits):
+                self.assertAlmostEqual(got["score"], score, delta=0.02)
+        keys = [(r["steps"], -r["scores"][0]["score"]) for r in self.data["utopy_list"]]
+        self.assertEqual(keys, sorted(keys))                       # fewest steps first, then highest score
+        if listed:
+            self.assertIsNone(self.data["utopy_closest"])
+        else:
+            self.assertGreater(self.data["utopy_closest"]["points_short"], 0)
+        # information only: every Pick Score is still exactly the recipe
+        for row in self.data["pick_score_list"]:
+            self.assertAlmostEqual(row["pick_score"], config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * row["comfort"]
+                                   + config.WEIGHT_OTP * row["otp_points"], delta=0.02)
+
+    def test_utopy_table_is_last_on_the_growth_tab_with_its_texts(self):
+        html = read("index.html")
+        growth = html[html.index('id="tab-growth"'):]
+        self.assertLess(growth.index('id="next-table"'), growth.index('id="utopy-table"'))
+        self.assertLess(growth.index('id="growth-table"'), growth.index('id="next-table"'))
+        for text in ("Utopy picks", "Long-term goals, information only", 'id="utopy-basis"'):
+            self.assertIn(text, growth)
+        self.assertIn("Based on patch", read("app.js"))
+        self.assertIn("can change each patch", read("app.js"))
+
     def test_growth_tips_follow_the_number_3_rule(self):
         """A tip exists exactly when the target-mastery Pick Score beats both the champion's own score and the current #3 pick."""
         cards = self.cards_by_name()
@@ -381,7 +497,7 @@ class SiteDataTests(unittest.TestCase):
             source = f.read()
         for key in ("win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games", "cards_not_ranked",
                     "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort", "comfort_parts",
-                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor", "next_step_list", "next_step_closest",
+                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor", "next_step_list", "next_step_closest", "utopy_list", "utopy_closest",
                     "pick_score_at_main", "best_tier_at_main"):
             self.assertIn('"%s"' % key, source)
 

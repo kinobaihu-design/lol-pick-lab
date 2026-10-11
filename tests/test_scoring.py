@@ -433,5 +433,119 @@ class NextStepTests(unittest.TestCase):
         self.assertEqual(model.next_step_list({}, {}, [], self.average, {"average_pick_score": None, "spread": 0.0}), ([], None))
 
 
+class UtopyTests(NextStepTests):
+    """v0.40: "Utopy picks", long-term goals. Information only: no score and no other list changes."""
+
+    S_LINE = 70.0 + 1.5 * 5.0
+
+    def run_utopy(self, rows):
+        eligible = {v["id"]: v for v, _ in rows}
+        carded = {v["id"]: c for v, c in rows}
+        return model.utopy_list(eligible, carded, [v for v, _ in rows], self.average, self.STATS)
+
+    def reach(self, v, card, level):
+        return model.score_at_mastery(v, card, self.average, self.STATS, level)
+
+    def test_who_is_listed_follows_the_s_cutoff_at_good_or_main(self):
+        seen = set()
+        for mastery in ("never_played", "below_average", "average", "good"):
+            for stats in range(0, 101, 5):
+                v, card = self.champion(1, "Kalista", float(stats), "B", mastery)
+                above = [lv for lv in ("good", "main") if config.MASTERY_ORDER.index(lv) > config.MASTERY_ORDER.index(mastery)]
+                expect = [lv for lv in above if self.reach(v, card, lv)[0] >= self.S_LINE - 1e-9
+                          and self.reach(v, card, lv)[1] == "S"]
+                rows, _ = self.run_utopy([(v, card)])
+                self.assertEqual([s["level"] for r in rows for s in r["scores"]], expect, (mastery, stats))
+                seen.add(bool(expect))
+        self.assertEqual(seen, {True, False})
+
+    def test_main_champions_and_champions_already_in_s_are_never_listed(self):
+        rows, closest = self.run_utopy([self.champion(1, "Kalista", 100.0, "S", "main"),
+                                        self.champion(2, "Jinx", 100.0, "S", "average"),       # already S now
+                                        self.champion(3, "Sivir", 100.0, "B", "average")])
+        self.assertEqual([r["name"] for r in rows], ["Sivir"])
+        self.assertIsNone(closest)
+
+    def test_good_versus_main_choice_and_steps_away(self):
+        kinds = set()
+        for stats in range(0, 101, 1):
+            v, card = self.champion(1, "Kalista", float(stats), "B", "below_average")
+            good_s = self.reach(v, card, "good")[1] == "S"
+            main_s = self.reach(v, card, "main")[1] == "S"
+            rows, _ = self.run_utopy([(v, card)])
+            if not main_s:
+                self.assertEqual(rows, [], stats)
+                continue
+            r = rows[0]
+            if good_s:
+                kinds.add("both")
+                self.assertEqual((r["first_level"], r["steps"], [s["level"] for s in r["scores"]]), ("good", 2, ["good", "main"]))
+            else:
+                kinds.add("main only")
+                self.assertEqual((r["first_level"], r["steps"], [s["level"] for s in r["scores"]]), ("main", 3, ["main"]))
+            for s in r["scores"]:
+                self.assertAlmostEqual(s["score"], self.reach(v, card, s["level"])[0])
+            self.assertAlmostEqual(r["pick_score_now"], v["pick_score"])
+        self.assertEqual(kinds, {"both", "main only"})
+        # a Good champion can only be listed for Main: one step
+        v, card = self.champion(1, "Kalista", 100.0, "B", "good")
+        rows, _ = self.run_utopy([(v, card)])
+        self.assertEqual((rows[0]["first_level"], rows[0]["steps"]), ("main", 1))
+        # steps are counted in mastery levels from the current one
+        for mastery, steps in (("never_played", 4), ("below_average", 3), ("average", 2), ("good", 1)):
+            v, card = self.champion(1, "Kalista", 100.0, "B", mastery)
+            first = next(lv for lv in ("good", "main")
+                         if config.MASTERY_ORDER.index(lv) > config.MASTERY_ORDER.index(mastery) and self.reach(v, card, lv)[1] == "S")
+            rows, _ = self.run_utopy([(v, card)])
+            gap = config.MASTERY_ORDER.index(first) - config.MASTERY_ORDER.index(mastery)
+            self.assertEqual(rows[0]["steps"], gap, mastery)
+
+    def test_order_is_fewest_steps_then_highest_score(self):
+        a = self.champion(1, "Kalista", 100.0, "B", "good")              # 1 step
+        b = self.champion(2, "Draven", 100.0, "B", "average")
+        c = self.champion(3, "Nilah", 100.0, "B", "average")
+        d = self.champion(4, "Zeri", 100.0, "B", "never_played")
+        rows, _ = self.run_utopy([d, c, b, a])
+        keys = [(r["steps"], -r["scores"][0]["score"]) for r in rows]
+        self.assertEqual(keys, sorted(keys))
+        self.assertEqual(rows[0]["steps"], min(r["steps"] for r in rows))
+
+    def test_empty_list_gives_the_closest_champion_short_of_s_at_main(self):
+        low = self.champion(1, "Draven", 0.0, "D", "never_played")
+        mid = self.champion(2, "Nilah", 30.0, "C", "never_played")
+        rows, closest = self.run_utopy([low, mid])
+        self.assertEqual(rows, [])
+        mains = {v["name"]: self.reach(v, card, "main")[0] for v, card in (low, mid)}
+        self.assertEqual(closest["name"], max(mains, key=mains.get))
+        self.assertAlmostEqual(closest["points_short"], self.S_LINE - mains[closest["name"]])
+        self.assertGreater(closest["points_short"], 0)
+        self.assertEqual(model.utopy_list({}, {}, [], self.average, {"average_pick_score": None, "spread": 0.0}), ([], None))
+
+    def test_no_closest_line_when_someone_is_listed_even_if_others_are_not(self):
+        listed = self.champion(1, "Kalista", 100.0, "B", "good")
+        unlisted = self.champion(2, "Draven", 0.0, "D", "never_played")
+        rows, closest = self.run_utopy([listed, unlisted])
+        self.assertEqual([r["name"] for r in rows], ["Kalista"])
+        self.assertIsNone(closest)
+
+    def test_it_changes_nothing_else(self):
+        import copy
+        rows = [self.champion(1, "Kalista", 100.0, "B", "average"), self.champion(2, "Zeri", 60.0, "C", "never_played"),
+                self.champion(3, "Sivir", 95.0, "A", "good"), self.champion(4, "Jinx", 40.0, "D", "below_average")]
+        eligible = {v["id"]: v for v, _ in rows}
+        carded = {v["id"]: c for v, c in rows}
+        pick = [v for v, _ in rows]
+        before_inputs = copy.deepcopy((eligible, pick))
+        next_before = model.next_step_list(eligible, carded, pick, self.average, self.STATS)
+        tips_before = model.growth_advisor(eligible, carded, pick, self.average, self.STATS)
+        model.utopy_list(eligible, carded, pick, self.average, self.STATS)
+        self.assertEqual((eligible, pick), before_inputs)                                         # nothing was written to
+        self.assertEqual(model.next_step_list(eligible, carded, pick, self.average, self.STATS), next_before)
+        self.assertEqual(model.growth_advisor(eligible, carded, pick, self.average, self.STATS), tips_before)
+
+    def test_the_levels_tried_are_only_good_and_main(self):
+        self.assertEqual(config.UTOPY_LEVELS, ["good", "main"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -25,7 +25,7 @@
     CARDS_URL: "data/cards.json",
     // The page needs a scores file from at least this model version. If the live file is older and the
     // saved copy is newer, the saved copy is shown (with a notice) until the next collector run.
-    MIN_MODEL_VERSION: "v0.39"
+    MIN_MODEL_VERSION: "v0.40"
   };
   if (typeof module !== "undefined" && module.exports) module.exports = SETTINGS;
   else root.SETTINGS = SETTINGS;

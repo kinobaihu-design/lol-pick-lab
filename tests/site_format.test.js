@@ -338,3 +338,32 @@ test("ceiling at Main is a quiet text; the closest line says who is nearest", ()
   const rows = [{ name: "A", ceiling: "B" }, { name: "B", ceiling: "S" }];
   assert.strictEqual(F.sortRows(rows, "g_ceiling", "desc", F.GROWTH_COLUMNS, () => 0).map(r => r.name).join(""), "BA");
 });
+
+test("Utopy picks: steps, scores text (Good and Main), skill line and the empty/closest line", () => {
+  assert.strictEqual(F.stepsText(1), "1 step");
+  assert.strictEqual(F.stepsText(3), "3 steps");
+  const main = { pick_score_now: 68, scores: [{ level: "main", score: 78.54 }] };
+  assert.strictEqual(F.utopyScoresText(main), "68.0 → 78.5 at Main");
+  const both = { pick_score_now: 68, scores: [{ level: "good", score: 74.1 }, { level: "main", score: 78.54 }] };
+  assert.strictEqual(F.utopyScoresText(both), "68.0 → 74.1 at Good · 78.5 at Main");
+  assert.strictEqual(F.utopySkillText({ otp_delta: 4.6, otp_games: 340, otp_players: 12 }, 20), "OTP +4.6% · 12 OTPs · 340 games");
+  assert.strictEqual(F.utopySkillText({ otp_delta: 4.6, otp_games: 5, otp_players: 2 }, 20), "too few games");
+  assert.strictEqual(F.utopySkillText(undefined, 20), "too few games");
+  assert.strictEqual(F.utopyClosestText({ name: "Lucian", points_short: 1.234 }),
+    "None this patch · closest: Lucian, 1.2 points short of S at Main");
+  assert.strictEqual(F.utopyClosestText(null), "None this patch");
+});
+
+test("Utopy picks table sorts by every column", () => {
+  const list = [
+    { name: "Kai", current_mastery: "average", first_level: "main", steps: 2, scores: [{ score: 75 }], skill_delta: 3 },
+    { name: "Zed", current_mastery: "never_played", first_level: "main", steps: 4, scores: [{ score: 80 }], skill_delta: null },
+    { name: "Bob", current_mastery: "good", first_level: "main", steps: 1, scores: [{ score: 72 }], skill_delta: 1 }
+  ];
+  const by = (k, d) => F.sortRows(list, k, d, F.UTOPY_COLUMNS, t => t.scores[0].score).map(t => t.name).join("");
+  assert.strictEqual(by("u_steps", "asc"), "BobKaiZed");
+  assert.strictEqual(by("u_score", "desc"), "ZedKaiBob");
+  assert.strictEqual(by("u_champion", "asc"), "BobKaiZed");
+  assert.strictEqual(by("u_mastery", "asc"), "ZedKaiBob");
+  assert.strictEqual(by("u_skill", "desc"), "KaiBobZed");
+});

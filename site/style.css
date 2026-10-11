@@ -114,3 +114,13 @@ td.traitcell { white-space: normal; min-width: 240px; max-width: 340px; }
 .traits.compact .trait { padding: 0 6px; font-size: 11px; }
 #tab-growth .sectionhead { display: block; }
 @media (max-width: 700px) { h1 { font-size: 22px; } th, td { padding: 8px 8px; } .score { font-size: 17px; } }
+
+/* Utopy picks: the last, quieter table on the Growth tab */
+.utopy { margin-top: 8px; opacity: .85; }
+.utopy .sectionhead { font-size: 15px; margin-top: 30px; margin-bottom: 0; }
+.utopy table { font-size: 13px; }
+
+/* Footer: the Riot legal notice, visible under every tab */
+.sitefooter { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.sitefooter p { margin: 0 0 6px; max-width: 900px; }
+.sitefooter .about { font-size: 11px; }

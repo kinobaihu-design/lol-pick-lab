@@ -1,5 +1,5 @@
 // The hover texts for the column titles. All of them live here, so they can be updated with every
-// model version (currently v0.39). A test checks that the weights written below match the scoring code.
+// model version (currently v0.40). A test checks that the weights written below match the scoring code.
 (function (root) {
   var HELP = {
     rank: "Place in the list by Pick Score (1 = best pick). It keeps its number when you sort by another column.",
@@ -61,6 +61,14 @@
     n_score: "Pick Score now → Pick Score one mastery step up.",
     n_gain: "Pick Score points gained one mastery step up.",
     n_skill: "Information only, no effect on any score. How much better one-tricks win than average players, shown only with 20 or more bot-lane OTP games.",
+
+    utopy: "Alejandro's private name for long-term goals. Champions you are not Main on, not in S now, whose Pick Score would reach S at Good or at Main. Information only: it never changes a score or the other two lists.",
+    u_champion: "A champion with a card, not Main and not in S today.",
+    u_mastery: "Your mastery level on this champion today, from its card.",
+    u_level: "The first mastery level (Good, then Main) where its Pick Score would land in S, against this patch's tier cutoffs. Only this one champion's mastery changes.",
+    u_steps: "How many mastery steps from now to that level (Never played → Below average → Average → Good → Main). Example: Below average → Main = 3 steps.",
+    u_score: "Pick Score now → Pick Score at that level. When both Good and Main reach S, both scores are shown. Fewest steps first, then highest score.",
+    u_skill: "Information only, no effect on any score. How much better one-tricks win than average players, then how many OTPs and their bot-lane games. \"Too few games\" below 20 bot-lane OTP games.",
 
     g_ceiling: "Quiet extra, information only: the best tier the champion could reach at Main mastery. It never decides who appears in either list.",
     n_ceiling: "Quiet extra, information only: the best tier the champion could reach at Main mastery. It never decides who appears in either list.",

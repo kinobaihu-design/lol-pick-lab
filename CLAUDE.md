@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.39**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.40**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -280,6 +280,26 @@ Pasted from the owner; the live brief has the full details.
 - Sample-size labels: **Low under 10,000, Medium 10,000–29,999, High 30,000+** real games (this patch + last patch). One setting: `SAMPLE_SIZE_LIMITS` in `site/settings.js` (`low: 1000` is only the ranking floor).
 - No change to the Pick Score.
 
+## Brief changes v0.40 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- Growth tab gets a third table, **"Utopy picks"** (Alejandro's private name for long-term goals). Information only; no change to the Pick Score.
+  - Listed: every carded champion whose mastery is not Main and whose tier now is not S, whose Pick Score would reach S at Good or at Main. Same maths as the ceiling at Main (only that champion's mastery changes, compared with this patch's normal tier cutoffs). Only levels above the current mastery are tried (`UTOPY_LEVELS` in `scoring/config.py`).
+  - Columns: champion · mastery now · first level that reaches S · steps away · Pick Score now → score at that level (both Good and Main when both reach S) · the compact "skill pays off" line (or "too few games" below 20 bot-lane OTP games). Order: fewest steps first, then highest score at the first level.
+  - Last table on the Growth tab, smaller and quieter, subtitle "Long-term goals, information only", line "Based on patch X data; can change each patch.". When empty: "None this patch · closest: <champion>, N points short of S at Main". Code: `utopy_list` in `scoring/model.py` (written to the scores file as `utopy_list` and `utopy_closest`); the page reads them.
+  - It never changes a score or the "Top upgrades" / "Next step to A or S" lists (tests check).
+- **Riot developer rules plan approved** (Part B below).
+- **Phase 3 note:** the draft helper must always offer several choices with reasons, never one forced pick (Riot rule: apps can't dictate player decisions).
+
+### Riot developer rules (checked Oct 11, 2026)
+
+- Riot policy pages re-read on Oct 11, 2026. `developer.riotgames.com/policies/general`: **LAST UPDATED: MAY 29, 2025**. `developer.riotgames.com/docs/lol` (Developer API Policy and Game Policy sections): the page shows **no "last updated" date** (only "© 2021 Riot Games, Inc." and a Nov 20, 2023 note about Riot IDs).
+- Nothing changed from the rules we planned around: legal notice required; product must be registered with an up-to-date description; key never in code; HTTPS only; no data broker; no identifying hidden players; no apps that dictate player decisions. (Also noted: Riot logos only from the Press Kit and only when unavoidable; free tier required; no MMR/ELO alternatives to the official ranking.)
+- **Legal notice (footer, visible under all 4 tabs, outside `#content` so it shows while loading):** Riot's exact League wording from the docs/lol page with "LoL Pick Lab" as the product name: "LoL Pick Lab is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc." Below it, a small about line: free personal project for me and friends, no ads, no payments, no data sold; stats are combined from many Diamond+ ranked games and never show individual players.
+- Tests: `tests/test_site.py` (`LegalNoticeTests`: notice present with the exact wording, never inside one tab or a hidden element) and `tests/test_safety.py` (fails on any `RGAPI-` key-shaped text in the project files or in the main branch history).
+- **Safety audit, Oct 11 (report only; nothing was deleted or rewritten):** no key or key-shaped text in the code, any git branch's history, the unpacked `data` and `data-backup` files, the site files or the 42 GitHub Actions logs. Every Riot call is HTTPS (`collector/riot.py`), the key travels in the `X-Riot-Token` header and comes only from the `RIOT_API_KEY` secret. The site has no images and no Riot logos. Open finding: player codes are an unsalted truncated SHA-256 of the PUUID (`scramble` in `collector/store.py`), so anyone who knows a player's PUUID could look that player up in the public `data` branch. Fix proposal waits for the owner's decision (see open questions).
+
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
 
 - Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
@@ -308,6 +328,7 @@ Pasted from the owner; the live brief has the full details.
   - The old, unused ban code (Ban threat) was removed from `scoring/` and its tests.
 - **Local preview:** the preview program can't read the Documents folder, so it serves a copy at `~/.lol-pick-lab-preview` (see `.claude/launch.json`, port 8124). **Run `scripts/sync_preview.sh` after every change to `site/`**, or the preview shows old code (this is why the slice-2 hover help looked missing: the old preview served a frozen copy).
 - Vercel check (Oct 11): the repository has no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing is published yet.
+- **v0.40:** the Growth tab has a third, quieter table **Utopy picks** (see "Brief changes v0.40"), and every tab has the Riot legal notice and about line in a footer. `MIN_MODEL_VERSION` is now v0.40.
 - Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
 - Not deployed. Check before pushing to `main` whether Vercel would publish it (no `vercel.json` yet).
 
@@ -329,14 +350,14 @@ Pasted from the owner; the live brief has the full details.
   - [x] Slice 1: basic tier table (Oct 11)
   - [x] Slice 2: mastery shown as 1–5 colored dots under Comfort, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
   - [x] Slice 3: tabs Tier list · Meta · Comfort · Growth, Meta Score with Needs a card, Comfort breakdown, Growth advisor with "skill pays off", "too few games" below 20 OTP games (Oct 11, v0.37). Ban suggestions removed from this phase.
-- [ ] Follow Riot's developer rules: legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
+- [ ] Follow Riot's developer rules (v0.40: policies re-read Oct 11, 2026, no change; legal notice + about line footer done; safety audit done, salting decision open; **still to do: register the product in the Developer Portal**): legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
 - [ ] Publish on Vercel and share the link with one friend
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
 **Phase 3, draft helper**
 - [ ] Add matchup and synergy data from the collected matches (maybe: per-champion counter bans)
-- [ ] Draft screen: enter allies and enemies, get the top 3 picks with reasons, using champion traits (CC vs divers, sustain vs poke)
+- [ ] Draft screen: enter allies and enemies, get the top 3 picks with reasons, using champion traits (CC vs divers, sustain vs poke). **Always offer several choices with reasons, never one forced pick** (Riot rule: apps can't dictate player decisions)
 
 **Phase 4, later**
 - [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
@@ -359,6 +380,7 @@ Pasted from the owner; the live brief has the full details.
 - **Calibration list** (the owner's opinion, written Oct 3 before any data): the strongest bot-lane champions this meta, unordered: Jinx, Hwei, Lux, Tristana, Xayah, Caitlyn, Viktor, Ziggs, Twitch, Yunara, Zeri, Ashe, Draven. Test in Phase 2: do they land at the top of the Meta Score (data only)?
 - **Cards per role (Phase 2 design note from the owner):** store champion cards per champion + role, with the same card structure, but each role has its own types, trait list and priorities. A champion can have a bot-lane card and a support card.
 
+- **Player codes (decision needed, Oct 11 audit):** codes are an unsalted SHA-256 of the PUUID. Option: add a secret salt (GitHub secret) so codes can't be matched to a known PUUID; all stored player files would need to be rebuilt or dropped once. Also: match IDs sit in `state/` on the public `data` branch (the website doesn't need them; the collector does, to avoid double downloads).
 - **Collector health:** no email alerts (decided Oct 11). Check the collector by eye when the site looks stale; the page shows a "Last updated" time and warns when it is old.
 - **Sample-size limits:** recheck the Low / Medium / High limits (changed in v0.39 to under 10,000 / 10,000 / 30,000 real games) after a few patches.
 
@@ -383,6 +405,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.40** (Oct 11, 2026): no score change. Growth tab gets the third table "Utopy picks" (long-term goals, information only). Riot developer rules plan: legal notice and about line footer on all tabs, key-scan and legal-notice tests, safety audit.
 - **v0.39** (Oct 11, 2026): no score change. Growth advisor uses the next mastery level only (both lists); "Could reach A or S" becomes "Next step to A or S" with a "closest" line when empty; ceiling at Main kept as information only; sample-size labels Low under 10,000, Medium 10,000–29,999, High 30,000+.
 - **v0.38** (Oct 11, 2026): no score change. Growth advisor split into Top upgrades and Could reach A or S (Main mastery lands in A or S); skill pays off shown compact; ban code removed.
 - **v0.37** (Oct 11, 2026): no score change. Ban suggestions moved to later. Growth advisor gets an information-only "skill pays off" signal (OTP win rate − overall win rate, shown with 20+ bot-lane OTP games). OTP win rate shows "too few games" below 20 bot-lane OTP games. Tier list page gets tabs (slice 3).

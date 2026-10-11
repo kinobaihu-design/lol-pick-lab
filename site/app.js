@@ -377,6 +377,17 @@
     body.appendChild(tr);
   }
 
+  function utopyRows(t, body) {
+    var tr = el("tr");
+    cell(tr, t.name, "champ");
+    cell(tr, F.masteryText(t.current_mastery));
+    cell(tr, F.masteryText(t.first_level));
+    cell(tr, F.stepsText(t.steps), "num");
+    cell(tr, F.utopyScoresText(t), "num");
+    cell(tr, F.utopySkillText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN), "skill");
+    body.appendChild(tr);
+  }
+
   function nextRows(t, body) {
     var tr = el("tr");
     cell(tr, t.name, "champ");
@@ -501,6 +512,23 @@
     emptyLine.textContent = F.closestText(data.next_step_closest);
     emptyLine.hidden = !hasNext || next.length !== 0;
     document.getElementById("next-old").hidden = hasNext;
+
+    var hasUtopy = Array.isArray(data.utopy_list);
+    var utopy = (data.utopy_list || []).map(function (t) {
+      var copy = {};
+      Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
+      copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+      return copy;
+    });
+    tables.utopy = sortableTable("utopy-table", F.UTOPY_COLUMNS, "u_steps", function (t) { return t.scores[0].score; }, utopyRows);
+    tables.utopy.list = utopy;
+    tables.utopy.draw();
+    document.getElementById("utopy-wrap").hidden = utopy.length === 0;
+    var utopyEmpty = document.getElementById("utopy-empty");
+    utopyEmpty.textContent = F.utopyClosestText(data.utopy_closest);
+    utopyEmpty.hidden = !hasUtopy || utopy.length !== 0;
+    document.getElementById("utopy-old").hidden = hasUtopy;
+    document.getElementById("utopy-basis").textContent = "Based on patch " + data.patch + " data; can change each patch.";
 
     drawNotRanked(data);
   }
