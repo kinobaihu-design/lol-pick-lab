@@ -1,10 +1,10 @@
-"""Scoring settings (model v0.37). Change numbers here, not in the rest of the code.
+"""Scoring settings (model v0.38). Change numbers here, not in the rest of the code.
 
 Every number below comes from the project brief. If the brief changes, change it here
 and bump MODEL_VERSION.
 """
 
-MODEL_VERSION = "v0.37"
+MODEL_VERSION = "v0.38"
 
 # ---- Pick Score = 0.425 x Stats + 0.525 x Comfort + 0.05 x OTP ----
 WEIGHT_STATS = 0.425
@@ -14,7 +14,7 @@ WEIGHT_OTP = 0.05
 # ---- Filters (a champion must pass all four to be ranked) ----
 MIN_REAL_GAMES = 1000     # real games (before the double weight), this patch + last patch together
 MIN_LANE_SHARE = 0.10     # share of the champion's games played in the lane (blended)
-MIN_PICK_RATE = 0.008     # pick rate (blended); also the bar for the ban list
+MIN_PICK_RATE = 0.008     # pick rate (blended)
 # What "pick rate" means (brief v0.35): the champion's bot-lane games / all games. Games the
 # champion plays in other roles never count. Only Diamond+ players are stored (about 7.4 of the
 # 10 players per game), so "all games" is estimated as Diamond+ participants / 10; that keeps

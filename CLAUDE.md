@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.37**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.38**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -90,7 +90,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
-- **Ban suggestions (moved to later in v0.37; do not build any ban list now)** (any role, separate from picks), by data only (needs the same 1,000 real games and the same pick-rate bar, 0.8%, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat. Any role, and each champion's main role is shown.
+- **Ban suggestions (moved to later in v0.37; the old code was removed in v0.38; do not build any ban list now)** (any role, separate from picks), by data only (needs the same 1,000 real games and the same pick-rate bar, 0.8%, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat. Any role, and each champion's main role is shown.
 - **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label, and in the **Needs a card** list: champions that pass the filters but have no card, sorted by Meta Score. They are not in the Growth advisor (v0.35).
 
 ### Comfort in detail
@@ -257,10 +257,18 @@ Pasted from the owner; the live brief has the full details.
 
 Pasted from the owner; the live brief has the full details.
 
-- Ban suggestions removed from Phase 2 (moved to later; per-champion counter bans stay in Phase 3, maybe). **Do not build any ban list.** (The old Ban threat code in `scoring/model.py` is left alone and unused by the site.)
+- Ban suggestions removed from Phase 2 (moved to later; per-champion counter bans stay in Phase 3, maybe). **Do not build any ban list.** (The old Ban threat code was removed in v0.38.)
 - Growth advisor gets a "skill pays off" signal: OTP win rate − overall win rate for that champion, shown only with 20+ bot-lane OTP games. Information only: it must not change any score.
 - OTP win rate is hidden below 20 bot-lane OTP games and shows "too few games" instead (Mel showed 0.0% from 2 games). The OTP score calculation itself does not change. The 20 is one setting: `OTP_MIN_GAMES_SHOWN` in `site/settings.js`.
 - Slice 3 = tabs instead of one long page.
+
+## Brief changes v0.38 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- Growth advisor split into two lists: "Top upgrades" (same rule as before: target mastery, shown only when it beats the current #3 pick) and "Could reach A or S" (every carded champion now in B, C or D whose Pick Score at Main mastery would land in A or S).
+- "Skill pays off" shown compact (e.g. "OTP +4.6% · 12 OTPs · 340 games"), still hidden below 20 bot-lane OTP games.
+- Slice 3 polish: patch-mix line at the top; colored Meta Score and Comfort boxes (tier steps ±0.5 / ±1.5 spreads); Comfort tab reordered; card-only information read straight from the cards; "best reachable" hover on the Tier list; old ban code removed.
 
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
 
@@ -279,6 +287,15 @@ Pasted from the owner; the live brief has the full details.
   - **OTP win rate** everywhere on the page shows "too few games" below 20 bot-lane OTP games.
   - **Hover help:** an instant custom tooltip (any element with `data-tip`; not the slow browser tooltip). Hover the **column titles** (the gray capital-letter words above each table), the **tab names**, the **Needs a card** heading, the ⚠ sign and the mastery dots. Texts for every tab and column are in `site/help.js` (currently v0.37); `tests/test_site.py` checks the numbers written there against `scoring/config.py` and `site/settings.js`.
   - `index.html?saved` forces the saved copy (`site/data/latest.json`), useful for checking new fields before the collector has produced them.
+- **v0.38 polish (Oct 11):**
+  - **Patch mix:** a line under the title, e.g. "Patch 16.20 · most champions 61–96% this patch" (10th to 90th percentile of the champions' this-patch share, worked out by the page), with a hover bubble giving the rule. Every champion's "Data: X% this patch" shows as a blue chip under Games (tier and Meta tables), with the same bubble.
+  - **Games are real games** (this patch + last patch, before the LAN/KR/NA/EUW double weight): `real_games` in the scores file is `counter[0] + counter[2]`; the double weight only feeds win rate and pick rate. A test checks the page never reads weighted numbers.
+  - **Colored boxes** for the Meta Score (Meta tab, Needs a card) and Comfort (Comfort tab): green above the average, red below, stronger each 0.5 and 1.5 spreads away (`SPREAD_STEPS` in `site/settings.js`, equal to the tier boundaries; a test checks). Average and spread come from the champions on that tab.
+  - **Cards are read straight from `site/data/cards.json`** (a copy of `scoring/cards.json`; **copy it again whenever a card changes, a test fails if they differ**). Type, strength, secondary type, traits, mastery, difficulty ratings and range come from there, so those never wait for the collector. The Comfort *numbers* (type points, base, kit adj.…) still come from `comfort_parts` in the scores file, so a changed card shows its new numbers after the next collector run. `card_info` is no longer written to the scores file.
+  - **Comfort tab order:** Champion · Comfort (colored box) · Trait score with trait badges · Mastery dots · then the smaller, lighter detail columns. Sorted by Comfort, highest first.
+  - **Growth tab:** two tables: **Top upgrades** (as before) and **Could reach A or S** (`reach_list` in the scores file: carded champions now in B, C or D whose Pick Score at Main lands in A or S; shows tier now → at Main and the gain). The scores file also gives every carded champion `pick_score_at_main` and `best_tier_at_main` (same Comfort and Pick Score code, only the mastery changes; the tier is read against the patch's current average and spread). The Tier list shows "Best reachable: B at Main" in a hover bubble on the name of a champion that can't reach A even at Main.
+  - **Which scores file:** the live file is used; only if it is from an older model version than `MIN_MODEL_VERSION` (settings) and the saved copy is newer, the saved copy is shown with a notice until the next collector run.
+  - The old, unused ban code (Ban threat) was removed from `scoring/` and its tests.
 - **Local preview:** the preview program can't read the Documents folder, so it serves a copy at `~/.lol-pick-lab-preview` (see `.claude/launch.json`, port 8124). **Run `scripts/sync_preview.sh` after every change to `site/`**, or the preview shows old code (this is why the slice-2 hover help looked missing: the old preview served a frozen copy).
 - Vercel check (Oct 11): the repository has no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing is published yet.
 - Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
@@ -356,6 +373,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.38** (Oct 11, 2026): no score change. Growth advisor split into Top upgrades and Could reach A or S (Main mastery lands in A or S); skill pays off shown compact; ban code removed.
 - **v0.37** (Oct 11, 2026): no score change. Ban suggestions moved to later. Growth advisor gets an information-only "skill pays off" signal (OTP win rate − overall win rate, shown with 20+ bot-lane OTP games). OTP win rate shows "too few games" below 20 bot-lane OTP games. Tier list page gets tabs (slice 3).
 - **v0.36** (Oct 11, 2026): the tier follows the Pick Score only. Stats floor removed (no more B cap, no more "*") and the S condition "win rate at or above the Diamond+ average" removed. Tiers: S +1.5 spreads or more, A +0.5 to +1.5, B −0.5 to +0.5, C −1.5 to −0.5, D below −1.5. New display-only ⚠ next to a win rate 1.5% or more below the Diamond+ average. On patch 16.20 data only Caitlyn changes tier (B* → A).
 - **v0.35** (Oct 11, 2026): weights Stats 42.5% / Comfort 52.5% / OTP 5%. Pick rate defined as the champion's bot-lane games ÷ all games (same numbers as before); pick-rate filter lowered from 1% to 0.8%. Tiers by spreads from the patch's average Pick Score (S +1.5 and win rate at or above average, A +0.5, B −0.5, C −1.5); stats floor kept; boundaries in config. Growth advisor only for champions with a card; new "Needs a card" list. Ban threat shows each champion's role. Yasuo and Katarina stay excluded.

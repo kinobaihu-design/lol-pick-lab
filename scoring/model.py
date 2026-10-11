@@ -1,4 +1,4 @@
-"""The scoring model, step by step as in the brief (v0.36).
+"""The scoring model, step by step as in the brief (v0.38).
 
 Reads the files the collector saves (see the README on the `data` branch) and returns
 one dictionary with everything the website will need.
@@ -107,9 +107,6 @@ def win_rate_warning(win_rate_delta):
     return win_rate_delta <= config.WIN_RATE_WARNING_DELTA
 
 
-ROLE_NAMES = {"BOTTOM": "ADC / bot lane", "UTILITY": "Support", "JUNGLE": "Jungle", "MIDDLE": "Mid", "TOP": "Top"}
-
-
 DISPLAY_FIXES = {
     "MonkeyKing": "Wukong", "Nunu": "Nunu & Willump", "Renata": "Renata Glasc",
     "Velkoz": "Vel'Koz", "Khazix": "Kha'Zix", "Chogath": "Cho'Gath", "Leblanc": "LeBlanc",
@@ -180,25 +177,6 @@ def lane_pick_rate(patch, numbers):
     if config.PICK_RATE_BASIS == "lane":
         return numbers["weighted"] / patch.lane_games_weighted if patch.lane_games_weighted else None
     return game_pick_rate(patch, numbers["weighted"])
-
-
-def all_role_numbers(patch, champ):
-    entry = patch.champions.get(champ)
-    if not entry:
-        return None
-    games_w = wins_w = real = 0
-    best_role, best_games = None, -1
-    for role, counter in entry["roles"].items():
-        w, wins = patch.weighted(counter)
-        games_w += w
-        wins_w += wins
-        real += counter[0] + counter[2]
-        if counter[0] + counter[2] > best_games:
-            best_role, best_games = role, counter[0] + counter[2]
-    if not real:
-        return None
-    return {"real": real, "win_rate": 100.0 * wins_w / games_w, "weighted": games_w, "main_role": best_role,
-            "main_role_share": best_games / real}
 
 
 def lane_candidates(current, previous):
@@ -311,47 +289,6 @@ def otp_numbers(root, patches, eligible_ids):
     return result
 
 
-# ---------------------------------------------------------------- stage 3: ban threat (any role)
-
-
-def ban_threats(current, previous):
-    """Ban threat = (win rate - Diamond+ average) x pick rate, for champions above the average.
-    Any role; each row says which role the champion mostly plays. Same blending; pick rate =
-    share of games the champion appears in. Needs the same sample (1,000 real games and the
-    pick-rate bar) so thin samples can't top the list."""
-    rows = []
-    for champ in set(current.champions) | (set(previous.champions) if previous else set()):
-        cur = all_role_numbers(current, champ)
-        prev = all_role_numbers(previous, champ) if previous else None
-        if not cur and not prev:
-            continue
-        share = this_patch_share(cur["real"] if cur else 0, prev is not None)
-        if not cur:
-            share = 0.0
-        delta = blend(cur["win_rate"] - current.average if cur else None,
-                      prev["win_rate"] - previous.average if prev else None, share)
-
-        pick_rate = blend(game_pick_rate(current, cur["weighted"]) if cur else None,
-                          game_pick_rate(previous, prev["weighted"]) if prev else None, share)
-        real = (cur["real"] if cur else 0) + (prev["real"] if prev else 0)
-        if real < config.MIN_REAL_GAMES or pick_rate is None or pick_rate < config.MIN_PICK_RATE or delta <= 0:
-            continue
-        name = (current.champions.get(champ, {}).get("name") or previous.champions.get(champ, {}).get("name")
-                or "#%s" % champ)
-        rows.append({
-            "id": int(champ), "riot_name": name, "name": display_name(name),
-            "main_role": (cur or prev)["main_role"],
-            "role": ROLE_NAMES.get((cur or prev)["main_role"], (cur or prev)["main_role"]),
-            "main_role_share": (cur or prev)["main_role_share"],
-            "real_games": real,
-            "win_rate_delta": delta,
-            "pick_rate": pick_rate,
-            "ban_threat": delta * 100 * pick_rate,   # percentage points x pick-rate percent
-        })
-    rows.sort(key=lambda row: -row["ban_threat"])
-    return rows
-
-
 # ---------------------------------------------------------------- the whole model
 
 
@@ -425,15 +362,6 @@ def score_all(root, cards=None, now=None):
         v["traits"] = card.get("traits", {})
         v["main_type"] = card.get("main_type")
         v["kind"] = card.get("kind")
-        # What the Comfort tab shows next to comfort_parts (view only; nothing here feeds a score).
-        v["card_info"] = {
-            "main_strength": card["main_strength"],
-            "secondary_types": card.get("secondary_types", []),
-            "difficulty_riot": card["difficulty"]["riot"],
-            "difficulty_mine": card["difficulty"]["mine"],
-            "range": card["range"],
-            "flexible_build": bool(card.get("flexible_build")),
-        }
         v["pick_score"] = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * v["comfort"]
                            + config.WEIGHT_OTP * v["otp_points"])
 
@@ -450,16 +378,16 @@ def score_all(root, cards=None, now=None):
         v["win_rate_warning"] = win_rate_warning(v["win_rate_delta"])
     for i, v in enumerate(pick_list, 1):
         v["pick_rank"] = i
+    # What each champion would score at Main (same Comfort and Pick Score code, only the mastery changes).
+    for k, v in eligible.items():
+        if v["has_card"]:
+            v["pick_score_at_main"], v["best_tier_at_main"] = score_at_mastery(v, carded[k], trait_average, tier_stats, "main")
     meta_list = sorted(eligible.values(), key=lambda v: -v["meta_score"])
     for i, v in enumerate(meta_list, 1):
         v["meta_rank"] = i
 
     advisor = growth_advisor(eligible, carded, pick_list, trait_average, tier_stats)
-
-    ban_list = ban_threats(current, previous)
-    lane_names = {v["id"] for v in eligible.values()}
-    for row in ban_list:
-        row["bot_lane_champion"] = row["id"] in lane_names
+    reach = reach_list(eligible, carded, pick_list, trait_average, tier_stats)
 
     def clean(v):
         out = {k: v[k] for k in (
@@ -471,7 +399,7 @@ def score_all(root, cards=None, now=None):
         out["data_label"] = "Data: %d%% this patch" % round(100 * v["this_patch_share"])
         if v["has_card"]:
             out.update({k: v[k] for k in ("mastery", "traits", "main_type", "kind", "comfort", "comfort_parts", "pick_score", "pick_rank",
-                                          "spreads", "tier", "win_rate_warning", "card_info")})
+                                          "spreads", "tier", "win_rate_warning", "pick_score_at_main", "best_tier_at_main")})
         else:
             out["label"] = "no card yet"
         return out
@@ -514,7 +442,7 @@ def score_all(root, cards=None, now=None):
         "needs_a_card": [clean(v) for v in meta_list if not v["has_card"]],
         "tier_stats": tier_stats,
         "excluded_by_pool_rule": excluded,
-        "ban_threat_list": ban_list,
+        "reach_list": reach,
         "growth_advisor": advisor,
         "near_misses": sorted(why_out.values(), key=lambda row: -row["real_games"])[:15],
     }
@@ -559,6 +487,34 @@ def growth_advisor(eligible, carded, pick_list, trait_average, tier_stats):
         })
     suggestions.sort(key=lambda s: -s["pick_score_at_target"])
     return suggestions
+
+
+def score_at_mastery(v, card, trait_average, tier_stats, mastery):
+    """(Pick Score, tier) if the champion were played at `mastery`. Same code as the tier list; only the
+    mastery changes. The tier is read against the patch's current average and spread."""
+    new_comfort = comfort_module.comfort(card, trait_average, mastery)["comfort"]
+    after = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * new_comfort
+             + config.WEIGHT_OTP * v["otp_points"])
+    spreads = spreads_from_average(after, tier_stats["average_pick_score"], tier_stats["spread"])
+    return after, tier_of(spreads)
+
+
+def reach_list(eligible, carded, pick_list, trait_average, tier_stats):
+    """"Could reach A or S": every carded champion now in B, C or D whose Pick Score at Main mastery
+    would land in A or S. Information only; nothing here changes a score."""
+    rows = []
+    for v in pick_list:
+        if v["tier"] not in ("B", "C", "D"):
+            continue
+        k = next(key for key, e in eligible.items() if e is v)
+        after, tier = score_at_mastery(v, carded[k], trait_average, tier_stats, "main")
+        if tier in ("A", "S"):
+            rows.append({"id": v["id"], "name": v["name"], "current_mastery": v["mastery"],
+                         "tier_now": v["tier"], "tier_at_main": tier,
+                         "pick_score_now": v["pick_score"], "pick_score_at_main": after,
+                         "gain": after - v["pick_score"]})
+    rows.sort(key=lambda r: -r["pick_score_at_main"])
+    return rows
 
 
 def round_floats(value, digits=3):

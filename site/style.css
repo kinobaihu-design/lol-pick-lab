@@ -97,4 +97,20 @@ td.skill { white-space: normal; min-width: 240px; max-width: 360px; font-size: 1
 .mastery-text.mastery-main { color: var(--m-main); } .mastery-text.mastery-good { color: var(--m-good); }
 .mastery-text.mastery-average { color: var(--m-average); } .mastery-text.mastery-below_average { color: var(--m-below); }
 .mastery-text.mastery-never_played { color: var(--m-never); }
+.patchmix { margin: 0 0 10px; font-size: 18px; font-weight: 600; cursor: help; display: inline-block; }
+.chip { display: inline-block; margin-top: 3px; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  color: var(--B); background: color-mix(in srgb, var(--B) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--B) 45%, var(--line)); }
+.box { display: inline-block; min-width: 64px; padding: 5px 12px; border-radius: 8px; text-align: center; font-size: 20px; font-weight: 800;
+  font-variant-numeric: tabular-nums; }
+:root { --p2: #1b8a4b; --p2t: #fff; --p1: #bfe6cf; --p1t: #0f4a29; --n0: #e6e9ee; --n0t: #3a4252; --n1: #f6c9c3; --n1t: #7a1f14; --n2: #c0392b; --n2t: #fff; }
+@media (prefers-color-scheme: dark) { :root { --p2: #2e9d5b; --p1: #1f4a35; --p1t: #bfe6cf; --n0: #2c3240; --n0t: #c8cfdc; --n1: #5a2a25; --n1t: #f6c9c3; --n2: #c4564a; } }
+.box-p2 { background: var(--p2); color: var(--p2t); } .box-p1 { background: var(--p1); color: var(--p1t); }
+.box-0 { background: var(--n0); color: var(--n0t); }
+.box-n1 { background: var(--n1); color: var(--n1t); } .box-n2 { background: var(--n2); color: var(--n2t); }
+th.detail-col, td.detail-col { font-size: 12px; color: var(--muted); font-weight: 400; }
+td.traitcell { white-space: normal; min-width: 240px; max-width: 340px; }
+.traitscore { font-size: 16px; margin-right: 8px; vertical-align: top; }
+.traits.compact { display: inline-flex; gap: 3px; max-width: 300px; vertical-align: top; }
+.traits.compact .trait { padding: 0 6px; font-size: 11px; }
+#tab-growth .sectionhead { display: block; }
 @media (max-width: 700px) { h1 { font-size: 22px; } th, td { padding: 8px 8px; } .score { font-size: 17px; } }

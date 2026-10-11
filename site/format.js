@@ -121,21 +121,6 @@
     return entry.name + ": " + why;
   }
 
-  // Each sortable column: what to sort by, and which way is the first click ("desc" = best first).
-  var SORT_COLUMNS = {
-    rank:    { first: "desc", value: function (c) { return c.pick_score; } },
-    champion:{ first: "asc",  value: function (c) { return c.name.toLowerCase(); } },
-    tier:    { first: "desc", value: function (c) { return TIER_ORDER.indexOf(c.tier); }, then: "pick_score" },
-    mastery: { first: "desc", value: function (c) { return MASTERY_ORDER.indexOf(c.mastery); }, then: "pick_score" },
-    pick_score: { first: "desc", value: function (c) { return c.pick_score; } },
-    comfort: { first: "desc", value: function (c) { return c.comfort; } },
-    stats:   { first: "desc", value: function (c) { return c.stats; } },
-    otp:     { first: "desc", value: function (c) { return c.otp_points; } },
-    win_rate:{ first: "desc", value: function (c) { return c.win_rate; } },
-    vs_average: { first: "desc", value: function (c) { return c.win_rate_delta; } },
-    games:   { first: "desc", value: function (c) { return c.real_games; } }
-  };
-
   // ---- slice 3: tabs ----
 
   var TYPE_NAMES = { mobility: "Mobility", peel: "Peel", hypercarry: "Hypercarry", utility: "Utility",
@@ -210,15 +195,14 @@
     return Number(champ.otp_games) >= minGames ? Number(champ.otp_delta) : null;
   }
 
-  // "OTPs win +6.0% more than average players (340 OTP games) \u2192 mastering it pays off".
-  // Empty with fewer than minGames OTP games. Information only: it never changes a score.
+  // Compact "skill pays off" line: "OTP +4.6% \u00b7 12 OTPs \u00b7 340 games" (OTP win rate minus the overall
+  // win rate). Empty with fewer than minGames bot-lane OTP games. Information only: it never changes a score.
   function skillPaysOffText(champ, minGames) {
     var d = skillDelta(champ, minGames);
     if (d === null) return "";
-    var games = Math.round(champ.otp_games).toLocaleString("en-US") + " OTP games";
-    if (d > 0.05) return "OTPs win " + signed(d, 1) + "% more than average players (" + games + ") \u2192 mastering it pays off";
-    if (d < -0.05) return "OTPs win " + number(-d, 1) + "% less than average players (" + games + ") \u2192 mastering it doesn't show up in win rate";
-    return "OTPs win about the same as average players (" + games + ") \u2192 no extra payoff from mastery";
+    var players = champ.otp_players || 0;
+    return "OTP " + signed(d, 1) + "% \u00b7 " + players + (players === 1 ? " OTP" : " OTPs") + " \u00b7 " +
+      Math.round(champ.otp_games).toLocaleString("en-US") + " games";
   }
 
   // Growth tip: one plain sentence. `list` is the Pick Score list (to find the champion's OTP numbers).
@@ -237,6 +221,85 @@
   function growthHeadline(tip) {
     return tip.name + ": " + number(tip.pick_score_now, 1) + " \u2192 " + number(tip.pick_score_at_target, 1) +
       " if " + masteryText(tip.target_mastery);
+  }
+
+  // ---- v0.38 ----
+
+  function normalise(name) {
+    return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
+  // The card details the Comfort tab shows next to the Comfort numbers.
+  function cardInfo(card) {
+    return { main_strength: card.main_strength, secondary_types: card.secondary_types || [],
+             difficulty_riot: card.difficulty.riot, difficulty_mine: card.difficulty.mine,
+             range: card.range, flexible_build: !!card.flexible_build };
+  }
+
+  // Read the card-only information (type, strength, traits, mastery, difficulty, range) straight from
+  // the champion cards (data/cards.json), so it never waits for the collector. Rows keep the scores
+  // file's own values only when the card can't be found. Returns how many rows were matched.
+  function applyCards(rows, cards) {
+    var byName = {};
+    (cards || []).forEach(function (card) { byName[normalise(card.riot_name)] = card; });
+    var matched = 0;
+    rows.forEach(function (c) {
+      var card = byName[normalise(c.riot_name || c.name)];
+      if (!card) return;
+      c.mastery = card.mastery;
+      c.traits = card.traits || {};
+      c.main_type = card.main_type;
+      c.kind = card.kind;
+      c.card_info = cardInfo(card);
+      matched++;
+    });
+    return matched;
+  }
+
+  function meanAndSpread(values) {
+    var n = values.length;
+    if (!n) return { mean: 0, spread: 0 };
+    var mean = values.reduce(function (a, b) { return a + b; }, 0) / n;
+    var variance = values.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / n;
+    return { mean: mean, spread: Math.sqrt(variance) };
+  }
+
+  // How far a number is from the average, in the same steps as the tiers: -2 (1.5 spreads or more
+  // below), -1 (0.5 or more below), 0 (within 0.5), +1, +2. `steps` = { mild: 0.5, strong: 1.5 }.
+  function spreadStep(value, mean, spread, steps) {
+    if (!spread) return 0;
+    var z = Math.round(((value - mean) / spread) * 100) / 100;       // rounded like the tier spreads
+    if (z >= steps.strong) return 2;
+    if (z >= steps.mild) return 1;
+    if (z <= -steps.strong) return -2;
+    if (z <= -steps.mild) return -1;
+    return 0;
+  }
+
+  function stepClass(step) {
+    return "box box-" + (step > 0 ? "p" + step : step < 0 ? "n" + (-step) : "0");
+  }
+
+  // "Patch 16.20 \u00b7 most champions 61\u201396% this patch": the middle 80% of champions (10th to 90th
+  // percentile of this patch's share), with the full range for the hover text.
+  function patchMix(list) {
+    var shares = list.map(function (c) { return c.this_patch_share; })
+      .filter(function (x) { return typeof x === "number"; }).sort(function (a, b) { return a - b; });
+    if (!shares.length) return null;
+    var at = function (p) { return shares[Math.min(shares.length - 1, Math.floor(p * shares.length))]; };
+    var pct = function (x) { return Math.round(100 * x); };
+    return { low: pct(at(0.1)), high: pct(at(0.9)), min: pct(shares[0]), max: pct(shares[shares.length - 1]) };
+  }
+
+  function patchMixText(patch, mix) {
+    if (!mix) return "Patch " + patch;
+    return "Patch " + patch + " \u00b7 most champions " + mix.low + "\u2013" + mix.high + "% this patch";
+  }
+
+  // Hover text on a name in the Tier list for a champion that can't reach A even at Main.
+  function bestReachText(champ) {
+    if (!champ.best_tier_at_main || champ.best_tier_at_main === "A" || champ.best_tier_at_main === "S") return "";
+    return "Best reachable: " + champ.best_tier_at_main + " at Main";
   }
 
   // Sorting. Each tab has its own columns: what to sort by, and which way is the first click
@@ -268,20 +331,20 @@
   };
 
   var COMFORT_COLUMNS = {
-    c_rank:   { first: "desc", value: function (c) { return c.comfort; } },
     c_champion: { first: "asc", value: function (c) { return c.name.toLowerCase(); } },
+    c_comfort: { first: "desc", value: function (c) { return c.comfort; } },
+    trait_score: { first: "desc", value: function (c) { return c.comfort_parts.trait_score; } },
+    c_mastery: { first: "desc", value: function (c) { return MASTERY_ORDER.indexOf(c.mastery); } },
     main_type: { first: "desc", value: function (c) { return c.comfort_parts.main_points; } },
     secondary_type: { first: "desc", value: function (c) { return c.comfort_parts.secondary_bonus; } },
     type_points: { first: "desc", value: function (c) { return c.comfort_parts.type_points; } },
-    c_mastery: { first: "desc", value: function (c) { return c.comfort_parts.mastery_points; } },
+    mastery_pts: { first: "desc", value: function (c) { return c.comfort_parts.mastery_points; } },
     base:     { first: "desc", value: function (c) { return c.comfort_parts.base; } },
-    trait_score: { first: "desc", value: function (c) { return c.comfort_parts.trait_score; } },
     kit_adj:  { first: "desc", value: function (c) { return c.comfort_parts.kit_adjustment; } },
     difficulty: { first: "asc", value: function (c) { return c.comfort_parts.difficulty; } },
     diff_adj: { first: "desc", value: function (c) { return c.comfort_parts.difficulty_adjustment; } },
     range_adj: { first: "desc", value: function (c) { return c.comfort_parts.range_adjustment; } },
-    flex:     { first: "desc", value: function (c) { return c.comfort_parts.flexibility_bonus; } },
-    c_comfort: { first: "desc", value: function (c) { return c.comfort; } }
+    flex:     { first: "desc", value: function (c) { return c.comfort_parts.flexibility_bonus; } }
   };
 
   var GROWTH_COLUMNS = {
@@ -293,6 +356,15 @@
     g_rank:   { first: "asc", value: function (t) { return t.would_rank; } },
     g_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_at_target); } },
     g_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
+  };
+
+  var REACH_COLUMNS = {
+    r_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
+    r_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
+    r_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_at_main); } },
+    r_score:  { first: "desc", value: function (t) { return t.pick_score_at_main; } },
+    r_gain:   { first: "desc", value: function (t) { return t.gain; } },
+    r_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
   };
 
   function firstDirection(key, columns) {
@@ -330,7 +402,10 @@
               masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
               sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS,
-              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS,
+              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, REACH_COLUMNS: REACH_COLUMNS,
+              normalise: normalise, cardInfo: cardInfo, applyCards: applyCards, meanAndSpread: meanAndSpread,
+              spreadStep: spreadStep, stepClass: stepClass, patchMix: patchMix, patchMixText: patchMixText,
+              bestReachText: bestReachText,
               typeText: typeText, mainTypeText: mainTypeText, secondaryTypeText: secondaryTypeText,
               difficultyText: difficultyText, masteryPointsText: masteryPointsText, flexText: flexText,
               needsCard: needsCard, otpWinRateText: otpWinRateText, skillDelta: skillDelta,

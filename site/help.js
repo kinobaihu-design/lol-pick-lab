@@ -1,5 +1,5 @@
 // The hover texts for the column titles. All of them live here, so they can be updated with every
-// model version (currently v0.37). A test checks that the weights written below match the scoring code.
+// model version (currently v0.38). A test checks that the weights written below match the scoring code.
 (function (root) {
   var HELP = {
     rank: "Place in the list by Pick Score (1 = best pick). It keeps its number when you sort by another column.",
@@ -22,27 +22,27 @@
     // ---- Meta tab ----
     meta_rank: "Place by Meta Score (1 = strongest on data alone). It keeps its number when you sort by another column.",
     m_champion: "Champions with no card yet say so; they have a Meta Score but no Pick Score.",
-    meta_score: "The data alone: 75% win rate points + 25% pick rate points, from 0 to 100. Same as the Stats number in the tier list.",
+    meta_score: "The data alone: 75% win rate points + 25% pick rate points, from 0 to 100. The box is green above the average Meta Score and red below, stronger each 0.5 and 1.5 spreads (standard deviations) away, like the tiers.",
     wr_points: "50 points at the Diamond+ average, 12.5 more for every point of win rate above it and 12.5 less for every point below, kept between 0 and 100. Worth 75% of Meta Score.",
     pr_points: "Pick rate ranked 0–100 among the ranked bot-lane champions (most picked = 100). Worth 25% of Meta Score.",
     pick_rate: "Share of all games the champion is picked in bot lane (Diamond+ participants ÷ 10 is the total). Needs 0.8% to be ranked.",
     needs_card: "Champions that pass the filters but have no card, sorted by Meta Score. Make a card to get a Pick Score.",
 
     // ---- Comfort tab ----
-    c_rank: "Place by Comfort (1 = highest). It keeps its number when you sort by another column.",
-    c_champion: "A champion with a card; each row shows how its Comfort number was built.",
+    c_champion: "A champion with a card. Type, strength, traits and mastery are read straight from the cards.",
+    c_comfort: "The final Comfort number, the same one the tier list uses (worth 52.5% of the Pick Score). The box is green above the average Comfort and red below, stronger each 0.5 and 1.5 spreads away.",
+    trait_score: "Sum of priority × level over the champion's traits (Low 0.5, Mid 1, High 1.5); the badges show each trait and its level. The Kit adjustment compares it with the patch average.",
+    c_mastery: "Your mastery, from 1 dot (Never played) to 5 (Main). Hover the dots for the name.",
     main_type: "The champion's main type and how strongly it fits it: High 100%, Mid 97.5%, Low 95% of the type's points.",
     secondary_type: "Optional second type. If it is worth more than the main type, 20% of the gap is added to the type points; otherwise it is only for information.",
     type_points: "Main type points (Mobility 100, Peel 90, Hypercarry and Utility 80, Mage and Lane bully 70, after strength) plus any secondary bonus. Worth 40% of the base.",
-    c_mastery: "Your mastery and its points: Main 100, Good 90, Average 80, Below average 70, Never played 60. Worth 60% of the base.",
+    mastery_pts: "Mastery points: Main 100, Good 90, Average 80, Below average 70, Never played 60. Worth 60% of the base.",
     base: "40% type points + 60% mastery points, before the adjustments.",
-    trait_score: "Sum of priority × level over the champion's traits (Low 0.5, Mid 1, High 1.5). The Kit adjustment compares it with the patch average.",
     kit_adj: "0.9 × (trait score − average trait score), at most ±5.",
     difficulty: "Riot's rating / your base rating → final difficulty (80% yours + 20% Riot's). Medium is 2.",
     diff_adj: "−3 × (difficulty − 2) × the mastery factor (Main 20% up to Never played 100%), at most ±3. Hard champions lose points unless you master them.",
     range_adj: "Short range −0.5, Medium 0, Long +0.5.",
     flex: "Beta bonus for champions that can be built two ways (Varus only): +1 × the mastery's flexibility factor.",
-    c_comfort: "Base + Kit + Difficulty + Range + Flexibility, capped at 100. Worth 52.5% of the Pick Score. Same number as the tier list.",
 
     // ---- Growth tab ----
     g_champion: "A champion with a card that is not yet a Main.",
@@ -52,7 +52,19 @@
     g_gain: "How many Pick Score points the champion would gain at the target mastery.",
     g_rank: "Where it would rank in the tier list at the target mastery.",
     g_tier: "Its tier at the target mastery, against this patch's average Pick Score.",
-    g_skill: "Information only, no effect on any score. How much better one-tricks win than average players, shown only with 20 or more bot-lane OTP games."
+    g_skill: "Information only, no effect on any score. How much better one-tricks win than average players, then how many OTPs and their bot-lane games. Shown only with 20 or more bot-lane OTP games.",
+    top_upgrades: "Same rule as before: one mastery level up (Never played, Below average and Average go to Good, Good goes to Main), shown only when the new Pick Score beats your current #3 pick.",
+    could_reach: "Every carded champion now in B, C or D whose Pick Score at Main mastery would land in A or S. Same scoring code as the tier list; only the mastery changes.",
+    r_champion: "A champion with a card, now in B, C or D.",
+    r_mastery: "Your mastery now. The list always assumes Main.",
+    r_tier: "Its tier now → its tier at Main mastery, against this patch's average Pick Score.",
+    r_score: "Pick Score now → Pick Score at Main mastery.",
+    r_gain: "Pick Score points gained at Main mastery.",
+    r_skill: "Information only, no effect on any score. How much better one-tricks win than average players, shown only with 20 or more bot-lane OTP games.",
+
+    // ---- patch mix and data label ----
+    patch_mix: "Most champions (the middle 80%) get this share of their numbers from this patch; the rest comes from last patch. Share of this patch = this patch's games ÷ (this patch's games + 1,000).",
+    data_label: "Share of this patch = this patch's games ÷ (this patch's games + 1,000). The rest of the champion's numbers come from last patch, so early in a patch the list is not empty."
   };
   if (typeof module !== "undefined" && module.exports) module.exports = HELP;
   else root.HELP = HELP;

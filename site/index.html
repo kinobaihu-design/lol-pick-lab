@@ -10,6 +10,7 @@
 <main>
   <header>
     <h1>Bot lane tier list</h1>
+    <p id="patchmix" class="patchmix" data-tip-key="patch_mix">&hellip;</p>
     <dl class="facts">
       <div><dt>Patch</dt><dd id="patch">&hellip;</dd></div>
       <div><dt>Last updated</dt><dd id="updated">&hellip;</dd></div>
@@ -105,31 +106,31 @@
         <table id="comfort-table">
           <thead>
             <tr>
-              <th class="num" data-sort="c_rank">#</th>
               <th data-sort="c_champion">Champion</th>
-              <th data-sort="main_type">Main type</th>
-              <th data-sort="secondary_type">Secondary type</th>
-              <th class="num" data-sort="type_points">Type pts</th>
-              <th data-sort="c_mastery">Mastery</th>
-              <th class="num" data-sort="base">Base</th>
-              <th class="num" data-sort="trait_score">Trait score</th>
-              <th class="num" data-sort="kit_adj">Kit adj.</th>
-              <th class="num" data-sort="difficulty">Difficulty</th>
-              <th class="num" data-sort="diff_adj">Diff. adj.</th>
-              <th class="num" data-sort="range_adj">Range adj.</th>
-              <th class="num" data-sort="flex">Flexibility</th>
               <th class="num" data-sort="c_comfort">Comfort</th>
+              <th data-sort="trait_score">Trait score &amp; traits</th>
+              <th data-sort="c_mastery">Mastery</th>
+              <th class="detail-col" data-sort="main_type">Main type</th>
+              <th class="detail-col" data-sort="secondary_type">Secondary type</th>
+              <th class="detail-col num" data-sort="type_points">Type pts</th>
+              <th class="detail-col num" data-sort="mastery_pts">Mastery pts</th>
+              <th class="detail-col num" data-sort="base">Base</th>
+              <th class="detail-col num" data-sort="kit_adj">Kit adj.</th>
+              <th class="detail-col num" data-sort="difficulty">Difficulty</th>
+              <th class="detail-col num" data-sort="diff_adj">Diff. adj.</th>
+              <th class="detail-col num" data-sort="range_adj">Range adj.</th>
+              <th class="detail-col num" data-sort="flex">Flexibility</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <p id="comfort-old" class="notice warn" hidden>This scores file doesn't carry the card details yet (strengths, difficulty ratings). They appear after the next collector run; the other numbers are real.</p>
     </section>
 
     <section id="tab-growth" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-growth" hidden>
-      <p class="intro">Champions that would beat your current #3 pick if you got better at them. Only champions with a card count.
-        The advice never changes any score.</p>
+      <p class="intro">Ideas for getting better at champions with a card. They are advice only and never change any score.</p>
+      <h2 class="sectionhead" data-tip-key="top_upgrades">Top upgrades</h2>
+      <p class="intro">Champions that would beat your current #3 pick if you got one mastery level better.</p>
       <div class="tablewrap" id="growth-wrap">
         <table id="growth-table">
           <thead>
@@ -147,7 +148,27 @@
           <tbody></tbody>
         </table>
       </div>
-      <p id="growth-empty" class="intro" hidden>No growth tips right now: nothing you could learn or improve would beat your current #3 pick.</p>
+      <p id="growth-empty" class="intro" hidden>No top upgrades right now: nothing you could learn or improve would beat your current #3 pick.</p>
+
+      <h2 class="sectionhead" data-tip-key="could_reach">Could reach A or S</h2>
+      <p class="intro">Champions now in B, C or D that would land in A or S if you played them at Main.</p>
+      <div class="tablewrap" id="reach-wrap">
+        <table id="reach-table">
+          <thead>
+            <tr>
+              <th data-sort="r_champion">Champion</th>
+              <th data-sort="r_mastery">Mastery now</th>
+              <th data-sort="r_tier">Tier now &rarr; at Main</th>
+              <th class="num" data-sort="r_score">Pick Score</th>
+              <th class="num" data-sort="r_gain">Gain</th>
+              <th data-sort="r_skill">Skill pays off?</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="reach-empty" class="intro" hidden>No champion in B, C or D would reach A or S at Main right now.</p>
+      <p id="reach-old" class="notice warn" hidden>This scores file is from before this list existed; it appears after the next collector run.</p>
     </section>
   </div>
 <div id="tip" role="tooltip" hidden></div>

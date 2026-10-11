@@ -48,13 +48,6 @@ def results_text(res):
          for c in res["pick_score_list"]]))
     out.append("(! = win rate 1.5% or more below the Diamond+ average; display only, no effect on the tier)")
 
-    out.append("\n## Ban threat, top 5 (any role)")
-    out.append(table(
-        ["#", "Champion", "Role (share of its games)", "Ban threat", "Win rate vs avg", "Pick rate", "Bot-lane champion?"],
-        [(i, b["name"], "%s (%s)" % (b["role"], pct(b["main_role_share"], 0)), "%.2f" % b["ban_threat"],
-          "%+.2f" % b["win_rate_delta"], pct(b["pick_rate"]), "yes" if b["bot_lane_champion"] else "no")
-         for i, b in enumerate(res["ban_threat_list"][:5], 1)]))
-
     out.append("\n## Growth advisor (champions with a card)")
     if res["growth_advisor"]:
         out.append(table(

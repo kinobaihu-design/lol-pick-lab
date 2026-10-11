@@ -242,19 +242,6 @@ class EndToEndTests(unittest.TestCase):
         share = 200 / 1200
         self.assertAlmostEqual(jinx["win_rate_delta"], share * (this - 50) + (1 - share) * (last - 50), places=3)
 
-    def test_ban_threat_is_any_role_and_positive_only(self):
-        old = config.MIN_REAL_GAMES
-        config.MIN_REAL_GAMES = 300
-        try:
-            result = model.score_all(self.root)
-        finally:
-            config.MIN_REAL_GAMES = old
-        for row in result["ban_threat_list"]:
-            self.assertGreater(row["win_rate_delta"], 0)
-            self.assertIn(row["role"], model.ROLE_NAMES.values())
-            self.assertTrue(0 < row["main_role_share"] <= 1)
-        self.assertEqual(result["ban_threat_list"], sorted(result["ban_threat_list"], key=lambda r: -r["ban_threat"]))
-
 
 class NeedsACardTests(unittest.TestCase):
     """Meta Score ranks every champion that passes the filters, carded or not; Needs a card is the uncarded ones by Meta Score."""
@@ -295,13 +282,6 @@ class NeedsACardTests(unittest.TestCase):
         self.assertTrue(all(not c["has_card"] for c in needs))
         self.assertEqual([c["name"] for c in self.result["pick_score_list"]], ["Jinx"])   # no Pick Score without a card
 
-    def test_comfort_card_details_are_written_for_the_comfort_tab(self):
-        jinx = self.result["pick_score_list"][0]
-        card = next(c for c in comfort.load_cards() if c["name"] == "Jinx")
-        self.assertEqual(jinx["card_info"]["difficulty_mine"], card["difficulty"]["mine"])
-        self.assertEqual(jinx["card_info"]["main_strength"], card["main_strength"])
-        self.assertEqual(jinx["comfort_parts"]["comfort"], jinx["comfort"])
-
 
 class GrowthAdvisorRuleTests(unittest.TestCase):
     """The advisor compares with the current #3 pick; fewer than 3 carded champions means no tips."""
@@ -334,6 +314,76 @@ class GrowthAdvisorRuleTests(unittest.TestCase):
         pick_list = sorted(eligible.values(), key=lambda v: -v["pick_score"])
         again = model.growth_advisor(eligible, carded, pick_list, average, stats)
         self.assertTrue(all(t["pick_score_at_target"] > pick_list[2]["pick_score"] for t in again))
+
+
+class ReachListTests(unittest.TestCase):
+    """"Could reach A or S": B, C or D champions whose Pick Score at Main would land in A or S."""
+
+    def setUp(self):
+        self.cards = {c["riot_name"]: c for c in comfort.load_cards()}
+        self.average = comfort.average_trait_score(list(self.cards.values()))
+
+    def champion(self, i, name, stats, tier, mastery=None):
+        card = self.cards[name]
+        mastery = mastery or card["mastery"]
+        parts = comfort.comfort(card, self.average, mastery)
+        score = config.WEIGHT_STATS * stats + config.WEIGHT_COMFORT * parts["comfort"] + config.WEIGHT_OTP * 50
+        return {"id": i, "name": name, "has_card": True, "mastery": mastery, "stats": stats, "otp_points": 50.0,
+                "pick_score": score, "tier": tier}, card
+
+    def test_score_at_main_uses_the_same_comfort_and_pick_score_code(self):
+        v, card = self.champion(1, "Kalista", 60.0, "B")
+        stats = {"average_pick_score": 70.0, "spread": 5.0}
+        after, tier = model.score_at_mastery(v, card, self.average, stats, "main")
+        main_comfort = comfort.comfort(card, self.average, "main")["comfort"]
+        self.assertAlmostEqual(after, config.WEIGHT_STATS * 60 + config.WEIGHT_COMFORT * main_comfort + config.WEIGHT_OTP * 50)
+        self.assertEqual(tier, model.tier_of(model.spreads_from_average(after, 70.0, 5.0)))
+        # only the mastery changes: at the card's own mastery it is the current score
+        same, _ = model.score_at_mastery(v, card, self.average, stats, card["mastery"])
+        self.assertAlmostEqual(same, v["pick_score"])
+
+    def test_only_b_c_d_champions_that_reach_a_or_s_are_listed(self):
+        stats = {"average_pick_score": 70.0, "spread": 5.0}
+        rows = [self.champion(1, "Kalista", 80.0, "B"),      # strong data: reaches S at Main
+                self.champion(2, "Draven", 5.0, "D"),        # weak data: stays low even at Main
+                self.champion(3, "Sivir", 80.0, "A", "main"),  # already A and Main: not listed (not B, C or D)
+                self.champion(4, "Zeri", 80.0, "C")]
+        eligible = {v["id"]: v for v, _ in rows}
+        carded = {v["id"]: c for v, c in rows}
+        pick_list = [v for v, _ in rows]
+        result = model.reach_list(eligible, carded, pick_list, self.average, stats)
+        names = [r["name"] for r in result]
+        self.assertIn("Kalista", names)
+        self.assertIn("Zeri", names)
+        self.assertNotIn("Draven", names)
+        self.assertNotIn("Sivir", names)
+        for r in result:
+            self.assertIn(r["tier_now"], "BCD")
+            self.assertIn(r["tier_at_main"], "AS")
+            self.assertGreater(r["pick_score_at_main"], r["pick_score_now"])
+        self.assertEqual(names, [r["name"] for r in sorted(result, key=lambda r: -r["pick_score_at_main"])])
+
+    def test_both_a_and_s_count_across_a_sweep_of_stats(self):
+        stats = {"average_pick_score": 70.0, "spread": 5.0}
+        seen = set()
+        for value in range(0, 101, 5):
+            v, card = self.champion(1, "Kalista", float(value), "B")
+            main_comfort = comfort.comfort(card, self.average, "main")["comfort"]
+            after = config.WEIGHT_STATS * value + config.WEIGHT_COMFORT * main_comfort + config.WEIGHT_OTP * 50
+            z = (after - 70.0) / 5.0
+            expected = "S" if z >= 1.5 else "A" if z >= 0.5 else "other"
+            seen.add(expected)
+            got = model.reach_list({1: v}, {1: card}, [v], self.average, stats)
+            if expected == "other":
+                self.assertEqual(got, [], value)
+            else:
+                self.assertEqual([r["tier_at_main"] for r in got], [expected], value)
+        self.assertEqual(seen, {"S", "A", "other"})        # the sweep really covers all three outcomes
+
+    def test_a_champion_already_at_main_never_gains(self):
+        stats = {"average_pick_score": 70.0, "spread": 5.0}
+        v, card = self.champion(1, "Sivir", 40.0, "C", "main")
+        self.assertEqual(model.reach_list({1: v}, {1: card}, [v], self.average, stats), [])
 
 
 if __name__ == "__main__":

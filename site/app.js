@@ -19,16 +19,37 @@
     });
   }
 
-  // Opening the page as index.html?saved shows the saved copy on purpose (handy for checking new fields).
-  function loadScores() {
-    if (/[?&]saved\b/.test(location.search)) return load(S.FALLBACK_URL).then(function (data) { return { data: data, fallback: true }; });
-    return load(S.DATA_URL).then(
-      function (data) { return { data: data, fallback: false }; },
-      function () { return load(S.FALLBACK_URL).then(function (data) { return { data: data, fallback: true }; }); }
-    );
+  function versionNumber(text) {
+    var m = /^v?(\d+)\.(\d+)$/.exec(String(text || ""));
+    return m ? Number(m[1]) * 1000 + Number(m[2]) : 0;
   }
 
-  function drawHeader(data, fallback) {
+  // The live scores file is used. Only when it is from an older model version than this page needs, and the
+  // saved copy that ships with the page is newer, the saved copy is shown (with a notice) until the next collector run.
+  // Opening the page as index.html?saved forces the saved copy (handy for checking).
+  function loadScores() {
+    var saved = function () { return load(S.FALLBACK_URL); };
+    if (/[?&]saved\b/.test(location.search)) return saved().then(function (data) { return { data: data, fallback: true, forced: true }; });
+    return load(S.DATA_URL).then(function (live) {
+      if (versionNumber(live.model_version) >= versionNumber(S.MIN_MODEL_VERSION)) return { data: live, fallback: false };
+      return saved().then(function (copy) {
+        if (versionNumber(copy.model_version) > versionNumber(live.model_version)) return { data: copy, fallback: true, older: true };
+        return { data: live, fallback: false };
+      }, function () { return { data: live, fallback: false }; });
+    }, function () {
+      return saved().then(function (data) { return { data: data, fallback: true }; });
+    });
+  }
+
+  // The champion cards (type, traits, mastery...) are read straight from the cards file, never from the collector.
+  function loadCards() {
+    return fetch(S.CARDS_URL, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (file) { return Array.isArray(file.cards) ? file.cards : []; }, function () { return []; });
+  }
+
+  function drawHeader(data, fallback, how) {
     document.getElementById("patch").textContent = "Patch " + data.patch;
     var when = new Date(data.generated);
     var hours = F.ageHours(data.generated, new Date());
@@ -42,9 +63,11 @@
     notice.textContent = "";
     if (fallback) {
       notice.className = "notice warn";
-      notice.textContent = /[?&]saved\b/.test(location.search)
+      notice.textContent = how.forced
         ? "Showing the saved copy that ships with this page, because you asked for it (?saved), not the live data."
-        : "Showing a saved copy that ships with this page, not the live data. The live scores could not be reached.";
+        : how.older
+          ? "The live scores file is from an older model version, so this page shows its newer saved copy until the next collector run."
+          : "Showing a saved copy that ships with this page, not the live data. The live scores could not be reached.";
     }
     if (F.isStale(data.generated, new Date(), S.STALE_AFTER_HOURS)) {
       var stale = el("p", "notice bad", "These scores are more than " + S.STALE_AFTER_HOURS +
@@ -127,6 +150,21 @@
       th.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
     });
     return self;
+  }
+
+  // "Data: 96% this patch": easy to spot, with the rule in a hover bubble.
+  function dataChip(c) {
+    var label = F.dataLabel(c);
+    if (!label) return null;
+    var chip = el("span", "chip", label);
+    chip.setAttribute("data-tip", H.data_label);
+    return chip;
+  }
+
+  // A number in a colored box: green above the average, red below, stronger the further away (tier steps).
+  function colorBox(text, value, stats) {
+    var box = el("span", F.stepClass(F.spreadStep(value, stats.mean, stats.spread, S.SPREAD_STEPS)), text);
+    return box;
   }
 
   function tierBadge(tier) {
@@ -213,6 +251,8 @@
       state.open[c.name] = !state.open[c.name];
       tables.tier.draw();
     });
+    var reach = F.bestReachText(c);
+    if (reach) btn.setAttribute("data-tip", reach);
     nameCell.appendChild(btn);
     tr.appendChild(nameCell);
 
@@ -235,6 +275,8 @@
     var sample = F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS);
     var gamesCell = cell(tr, F.games(c.real_games), "num");
     gamesCell.appendChild(el("span", "sub sample-" + sample.split(" ")[0], sample + " sample"));
+    var chip = dataChip(c);
+    if (chip) gamesCell.appendChild(chip);
     body.appendChild(tr);
     if (state.open[c.name]) body.appendChild(detailRow(c));
   }
@@ -250,7 +292,8 @@
     var tr = el("tr");
     cell(tr, state.metaRankOf[c.name], "num rank");
     nameWithLabel(tr, c);
-    cell(tr, F.number(c.meta_score, 1), "num score");
+    var metaCell = cell(tr, "", "num");
+    metaCell.appendChild(colorBox(F.number(c.meta_score, 1), c.meta_score, state.metaStats));
     cell(tr, F.number(c.win_rate_points, 1), "num");
     cell(tr, F.number(c.pick_rate_points, 1), "num");
     winRateCell(tr, c);
@@ -259,6 +302,8 @@
     var sample = F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS);
     var gamesCell = cell(tr, F.games(c.real_games), "num");
     gamesCell.appendChild(el("span", "sub sample-" + sample.split(" ")[0], sample + " sample"));
+    var chip = dataChip(c);
+    if (chip) gamesCell.appendChild(chip);
     body.appendChild(tr);
   }
 
@@ -266,7 +311,8 @@
     var tr = el("tr");
     cell(tr, state.metaRankOf[c.name], "num rank");
     cell(tr, c.name, "champ");
-    cell(tr, F.number(c.meta_score, 1), "num score");
+    var needCell = cell(tr, "", "num");
+    needCell.appendChild(colorBox(F.number(c.meta_score, 1), c.meta_score, state.metaStats));
     winRateCell(tr, c);
     cell(tr, F.number(100 * c.pick_rate, 1) + "%", "num");
     cell(tr, F.games(c.real_games), "num");
@@ -276,21 +322,36 @@
   // ---- Comfort tab ----
   function comfortRows(c, body) {
     var p = c.comfort_parts, tr = el("tr");
-    cell(tr, state.comfortRankOf[c.name], "num rank");
     cell(tr, c.name, "champ");
-    cell(tr, F.mainTypeText(c) || "\u2013");
-    cell(tr, F.secondaryTypeText(c) || "\u2013");
-    cell(tr, F.number(p.type_points, 1), "num");
-    var m = cell(tr, F.masteryPointsText(c));
-    m.className = "mastery-text mastery-" + c.mastery;
-    cell(tr, F.number(p.base, 1), "num");
-    cell(tr, F.number(p.trait_score, 1), "num");
-    cell(tr, F.signed(p.kit_adjustment, 2), "num");
-    cell(tr, F.difficultyText(c), "num");
-    cell(tr, F.signed(p.difficulty_adjustment, 2), "num");
-    cell(tr, F.signed(p.range_adjustment, 2), "num");
-    cell(tr, F.flexText(c), "num");
-    cell(tr, F.number(c.comfort, 1), "num score");
+    var comfortCell = cell(tr, "", "num");
+    comfortCell.appendChild(colorBox(F.number(c.comfort, 1), c.comfort, state.comfortStats));
+
+    var traitCell = el("td", "traitcell");
+    traitCell.appendChild(el("b", "traitscore", F.number(p.trait_score, 1)));
+    var box = el("span", "traits compact");
+    F.traitList(c.traits).forEach(function (t) {
+      var span = el("span", "trait trait-" + t.level);
+      span.appendChild(el("b", null, t.name));
+      span.appendChild(document.createTextNode(" " + t.levelName));
+      box.appendChild(span);
+    });
+    traitCell.appendChild(box);
+    tr.appendChild(traitCell);
+
+    var masteryCell = cell(tr, "");
+    if (c.mastery) masteryCell.appendChild(masteryIcon(c));
+
+    var D = "detail-col";
+    cell(tr, F.mainTypeText(c) || "\u2013", D);
+    cell(tr, F.secondaryTypeText(c) || "\u2013", D);
+    cell(tr, F.number(p.type_points, 1), "num " + D);
+    cell(tr, F.masteryPointsText(c), D + " num");
+    cell(tr, F.number(p.base, 1), "num " + D);
+    cell(tr, F.signed(p.kit_adjustment, 2), "num " + D);
+    cell(tr, F.difficultyText(c), "num " + D);
+    cell(tr, F.signed(p.difficulty_adjustment, 2), "num " + D);
+    cell(tr, F.signed(p.range_adjustment, 2), "num " + D);
+    cell(tr, F.flexText(c), "num " + D);
     body.appendChild(tr);
   }
 
@@ -312,6 +373,21 @@
     tr.appendChild(tierCell);
     var skill = F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
     cell(tr, skill, "skill");
+    body.appendChild(tr);
+  }
+
+  function reachRows(t, body) {
+    var tr = el("tr");
+    cell(tr, t.name, "champ");
+    cell(tr, F.masteryText(t.current_mastery));
+    var tierCell = el("td");
+    tierCell.appendChild(tierBadge(t.tier_now));
+    tierCell.appendChild(document.createTextNode(" \u2192 "));
+    tierCell.appendChild(tierBadge(t.tier_at_main));
+    tr.appendChild(tierCell);
+    cell(tr, F.number(t.pick_score_now, 1) + " \u2192 " + F.number(t.pick_score_at_main, 1), "num");
+    cell(tr, "+" + F.number(t.gain, 1), "num up");
+    cell(tr, F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN), "skill");
     body.appendChild(tr);
   }
 
@@ -357,10 +433,15 @@
   }
 
   // The page always opens on the Tier list, sorted by Pick Score (so by tier); sorts are not remembered.
-  function start(data) {
+  function start(data, cards) {
     state.data = data;
     var picks = data.pick_score_list;
     var metaList = data.meta_score_list || picks;
+    F.applyCards(picks, cards);
+    F.applyCards(metaList, cards);
+    document.getElementById("patchmix").textContent = F.patchMixText(data.patch, F.patchMix(metaList));
+    state.metaStats = F.meanAndSpread(metaList.map(function (c) { return c.meta_score; }));
+    state.comfortStats = F.meanAndSpread(picks.map(function (c) { return c.comfort; }));
     state.rankOf = {};
     F.ranked(picks).forEach(function (c, i) { state.rankOf[c.name] = i + 1; });
     state.metaRankOf = rankMap(metaList, "meta_score");
@@ -388,7 +469,6 @@
     tables.comfort = sortableTable("comfort-table", F.COMFORT_COLUMNS, "c_comfort", function (c) { return c.pick_score; }, comfortRows);
     tables.comfort.list = picks.filter(function (c) { return c.comfort_parts; });
     tables.comfort.draw();
-    document.getElementById("comfort-old").hidden = picks.every(function (c) { return c.card_info; });
 
     var tips = (data.growth_advisor || []).map(function (t) {
       var copy = {};
@@ -402,12 +482,27 @@
     document.getElementById("growth-wrap").hidden = tips.length === 0;
     document.getElementById("growth-empty").hidden = tips.length !== 0;
 
+    var hasReach = Array.isArray(data.reach_list);
+    var reach = (data.reach_list || []).map(function (t) {
+      var copy = {};
+      Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
+      copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+      return copy;
+    });
+    tables.reach = sortableTable("reach-table", F.REACH_COLUMNS, "r_score", function (t) { return t.pick_score_at_main; }, reachRows);
+    tables.reach.list = reach;
+    tables.reach.draw();
+    document.getElementById("reach-wrap").hidden = reach.length === 0;
+    document.getElementById("reach-empty").hidden = !hasReach || reach.length !== 0;
+    document.getElementById("reach-old").hidden = hasReach;
+
     drawNotRanked(data);
   }
 
-  loadScores().then(function (result) {
-    drawHeader(result.data, result.fallback);
-    start(result.data);
+  Promise.all([loadScores(), loadCards()]).then(function (both) {
+    var result = both[0];
+    drawHeader(result.data, result.fallback, result);
+    start(result.data, both[1]);
     document.getElementById("loading").hidden = true;
     document.getElementById("content").hidden = false;
   }, function () {

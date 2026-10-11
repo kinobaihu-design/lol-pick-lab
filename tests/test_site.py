@@ -70,7 +70,8 @@ class SiteFilesTests(unittest.TestCase):
         """Every sortable title in every table has a matching entry in format.js, in that table's own column set."""
         source = read("format.js")
         sets = {"tier-table": "SORT_COLUMNS", "meta-table": "META_COLUMNS", "needs-table": "META_COLUMNS",
-                "comfort-table": "COMFORT_COLUMNS", "growth-table": "GROWTH_COLUMNS"}
+                "comfort-table": "COMFORT_COLUMNS", "growth-table": "GROWTH_COLUMNS",
+                "reach-table": "REACH_COLUMNS"}
         for table, name in sets.items():
             block = re.search(r"var %s = \{(.*?)\n  \};" % name, source, re.S).group(1)
             keys = re.findall(r'data-sort="([^"]+)"', table_html(table))
@@ -93,6 +94,9 @@ class SiteFilesTests(unittest.TestCase):
 
 
 class TabTests(unittest.TestCase):
+    def data_text(self):
+        return read("data/latest.json")
+
     """Slice 3: four tabs, the page opens on the Tier list, tabs are plain buttons (no addresses, nothing remembered)."""
 
     def test_four_tabs_in_order_and_tier_list_is_open_first(self):
@@ -119,8 +123,9 @@ class TabTests(unittest.TestCase):
 
     def test_comfort_tab_has_every_column_asked_for(self):
         heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("comfort-table"))]
-        self.assertEqual(heads, ["#", "champion", "main type", "secondary type", "type pts", "mastery", "base",
-                                 "trait score", "kit adj.", "difficulty", "diff. adj.", "range adj.", "flexibility", "comfort"])
+        self.assertEqual(heads, ["champion", "comfort", "trait score &amp; traits", "mastery", "main type", "secondary type",
+                                 "type pts", "mastery pts", "base", "kit adj.", "difficulty", "diff. adj.", "range adj.", "flexibility"])
+        self.assertIn('"c_comfort"', read("app.js"))              # sorted by Comfort, highest first
         for word in ("<input", "<textarea", "<select", "contenteditable"):
             self.assertNotIn(word, read("index.html"))            # view only, no editing
 
@@ -128,7 +133,15 @@ class TabTests(unittest.TestCase):
         heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("growth-table"))]
         self.assertIn("skill pays off?", heads)
         self.assertIn("gain", heads)
+        html = read("index.html")
+        self.assertIn("Top upgrades", html)
+        self.assertIn("Could reach A or S", html)
+        reach = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("reach-table"))]
+        self.assertEqual(reach, ["champion", "mastery now", "tier now &rarr; at main", "pick score", "gain", "skill pays off?"])
         self.assertNotRegex(read("index.html") + read("app.js"), r"(?i)ban threat|ban suggestion|ban list")
+        with open(os.path.join(ROOT, "scoring", "model.py"), encoding="utf-8") as f:
+            self.assertNotRegex(f.read(), r"ban_threat|def ban_|ROLE_NAMES")      # the old ban code is gone
+        self.assertNotIn("ban_threat_list", self.data_text())
 
     def test_tabs_are_not_remembered_and_the_tooltip_is_instant(self):
         code = read("app.js")
@@ -211,8 +224,9 @@ class HoverHelpTests(unittest.TestCase):
             self.assertGreater(len(self.help[key]), 20, key)
 
     def test_the_help_file_says_v0_37(self):
-        self.assertIn("currently v0.37", read("help.js"))
-        self.assertEqual(config.MODEL_VERSION, "v0.37")
+        self.assertIn("currently v0.38", read("help.js"))
+        self.assertEqual(config.MODEL_VERSION, "v0.38")
+        self.assertIn('MIN_MODEL_VERSION: "%s"' % config.MODEL_VERSION, read("settings.js"))
 
     def test_new_texts_match_the_v0_37_numbers(self):
         h = self.help
@@ -223,13 +237,24 @@ class HoverHelpTests(unittest.TestCase):
         self.assertIn("Worth %s of Meta Score" % pct(config.STATS_WIN_RATE_SHARE), h["wr_points"])
         self.assertIn("Worth %s of Meta Score" % pct(config.STATS_PICK_RATE_SHARE), h["pr_points"])
         self.assertIn("Needs %s to be ranked" % pct(config.MIN_PICK_RATE), h["pick_rate"])
-        self.assertIn("Worth %s of the Pick Score" % pct(config.WEIGHT_COMFORT), h["c_comfort"])
+        self.assertIn("worth %s of the Pick Score" % pct(config.WEIGHT_COMFORT), h["c_comfort"])
+        b = dict(config.TIER_BOUNDARIES)
+        self.assertIn("%g and %g spreads" % (b["B"] * -1, b["S"]), h["c_comfort"])
+        self.assertIn("%g and %g spreads" % (b["B"] * -1, b["S"]), h["meta_score"])
+        # patch mix rule
+        for key in ("patch_mix", "data_label"):
+            self.assertIn("this patch's games ÷ (this patch's games + %s)" % format(config.BLEND_K, ","), h[key])
+        # v0.38 Growth lists
+        self.assertIn("beats your current #%d pick" % config.GROWTH_BEAT_RANK, h["top_upgrades"].replace("the new Pick Score beats", "beats").replace("your current", "your current"))
+        self.assertIn("B, C or D", h["could_reach"])
+        self.assertIn("A or S", h["could_reach"])
+        self.assertIn("at Main", h["r_tier"])
         self.assertIn(pct(config.WEIGHT_STATS), h["tab_tier"])
         self.assertIn(pct(config.WEIGHT_COMFORT), h["tab_tier"])
         self.assertIn(pct(config.WEIGHT_OTP), h["tab_tier"])
         # Comfort tab
         self.assertIn("Worth %s of the base" % pct(config.COMFORT_TYPE_SHARE), h["type_points"])
-        self.assertIn("Worth %s of the base" % pct(config.COMFORT_MASTERY_SHARE), h["c_mastery"])
+        self.assertIn("Worth %s of the base" % pct(config.COMFORT_MASTERY_SHARE), h["mastery_pts"])
         self.assertIn("%s type points + %s mastery points" % (pct(config.COMFORT_TYPE_SHARE), pct(config.COMFORT_MASTERY_SHARE)), h["base"])
         self.assertIn("High 100%, Mid 97.5%, Low 95%", h["main_type"])
         self.assertEqual([config.STRENGTH[k] for k in ("high", "mid", "low")], [1.0, 0.975, 0.95])
@@ -237,7 +262,7 @@ class HoverHelpTests(unittest.TestCase):
         self.assertEqual(config.SECONDARY_SHARE, 0.20)
         self.assertEqual(config.TYPE_POINTS, {"mobility": 100, "peel": 90, "hypercarry": 80, "utility": 80, "mage": 70, "lane_bully": 70})
         self.assertIn("Mobility 100, Peel 90, Hypercarry and Utility 80, Mage and Lane bully 70", h["type_points"])
-        self.assertIn("Main 100, Good 90, Average 80, Below average 70, Never played 60", h["c_mastery"])
+        self.assertIn("Main 100, Good 90, Average 80, Below average 70, Never played 60", h["mastery_pts"])
         self.assertEqual([config.MASTERY_POINTS[k] for k in ("main", "good", "average", "below_average", "never_played")], [100, 90, 80, 70, 60])
         self.assertIn("0.9 × (trait score", h["kit_adj"])
         self.assertIn("at most ±%g" % config.KIT_CAP, h["kit_adj"])
@@ -252,6 +277,7 @@ class HoverHelpTests(unittest.TestCase):
         # Growth tab
         minimum = int(re.search(r"OTP_MIN_GAMES_SHOWN:\s*(\d+)", read("settings.js")).group(1))
         self.assertIn("%d or more bot-lane OTP games" % minimum, h["g_skill"])
+        self.assertIn("%d or more bot-lane OTP games" % minimum, h["r_skill"])
         self.assertIn("#3", h["g_score"])
         self.assertEqual(config.GROWTH_BEAT_RANK, 3)
         self.assertIn("Never played and Below average are scored as Good", h["g_mastery"])
@@ -321,14 +347,50 @@ class SiteDataTests(unittest.TestCase):
             # the Pick Score is built from exactly this Comfort number
             expected = w.WEIGHT_STATS * row["stats"] + w.WEIGHT_COMFORT * row["comfort"] + w.WEIGHT_OTP * row["otp_points"]
             self.assertAlmostEqual(row["pick_score"], expected, delta=0.02, msg=row["name"])
-            # the type, difficulty and range columns come from the card
-            info = row["card_info"]
-            self.assertEqual(info["main_strength"], card["main_strength"])
-            self.assertEqual(info["secondary_types"], card.get("secondary_types", []))
-            self.assertEqual((info["difficulty_riot"], info["difficulty_mine"]), (card["difficulty"]["riot"], card["difficulty"]["mine"]))
-            self.assertEqual(info["range"], card["range"])
-            self.assertEqual(row["main_type"], card["main_type"])
             self.assertEqual(row["comfort_parts"]["mastery_points"], config.MASTERY_POINTS[card["mastery"]])
+
+    def test_the_page_reads_the_cards_file_which_is_a_copy_of_the_scoring_cards(self):
+        with open(os.path.join(ROOT, "scoring", "cards.json"), encoding="utf-8") as f:
+            original = json.load(f)
+        self.assertEqual(json.loads(read("data/cards.json")), original)
+        self.assertIn('CARDS_URL: "data/cards.json"', read("settings.js"))
+        code = read("app.js")
+        self.assertIn("F.applyCards(picks, cards)", code)           # type, traits, mastery from the cards, not the collector
+        self.assertNotIn("card_info", read("../scoring/model.py"))   # nothing card-only is copied into the scores file any more
+
+    def test_colored_box_steps_are_the_tier_steps(self):
+        b = dict(config.TIER_BOUNDARIES)
+        self.assertRegex(read("settings.js"), r"SPREAD_STEPS:\s*\{\s*mild:\s*%g,\s*strong:\s*%g\s*\}" % (b["A"], b["S"]))
+        self.assertEqual(b["B"], -b["A"])
+        self.assertEqual(b["C"], -b["S"])
+
+    def test_the_page_shows_real_games_never_the_double_weight(self):
+        for name in ("app.js", "format.js"):
+            self.assertNotRegex(read(name), r"weighted|double_weight|doubled")
+        code = read("app.js")
+        self.assertEqual(code.count("F.games(c.real_games)"), 4)     # tier table, details, meta, needs a card
+        for row in self.data["pick_score_list"]:
+            self.assertEqual(row["real_games"], row["real_games_this_patch"] + row["real_games_last_patch"], row["name"])
+
+    def test_could_reach_a_or_s_uses_the_scoring_code_at_main(self):
+        cards = self.cards_by_name()
+        rows = {r["id"]: r for r in self.data["pick_score_list"]}
+        tiers = self.data["tier_stats"]
+        mean, spread = tiers["average_pick_score"], tiers["spread"]
+        expected = set()
+        for row in rows.values():
+            new_comfort = comfort.comfort(cards[model.normalise(row["riot_name"])], self.data["trait_average"], "main")["comfort"]
+            after = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * new_comfort + config.WEIGHT_OTP * row["otp_points"]
+            self.assertAlmostEqual(row["pick_score_at_main"], after, delta=0.02, msg=row["name"])
+            tier = model.tier_of(model.spreads_from_average(after, mean, spread))
+            self.assertEqual(row["best_tier_at_main"], tier, row["name"])
+            if row["tier"] in "BCD" and tier in "AS":
+                expected.add(row["id"])
+        self.assertEqual({r["id"] for r in self.data["reach_list"]}, expected)
+        for r in self.data["reach_list"]:
+            self.assertEqual(r["tier_now"], rows[r["id"]]["tier"])
+            self.assertIn(r["tier_at_main"], "AS")
+            self.assertAlmostEqual(r["gain"], r["pick_score_at_main"] - r["pick_score_now"], delta=0.02)
 
     def test_growth_tips_follow_the_number_3_rule(self):
         """A tip exists exactly when the target-mastery Pick Score beats both the champion's own score and the current #3 pick."""
@@ -367,8 +429,9 @@ class SiteDataTests(unittest.TestCase):
         with open(os.path.join(ROOT, "scoring", "model.py"), encoding="utf-8") as f:
             source = f.read()
         for key in ("win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games", "cards_not_ranked",
-                    "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort", "card_info", "comfort_parts",
-                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor"):
+                    "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort", "comfort_parts",
+                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor", "reach_list",
+                    "pick_score_at_main", "best_tier_at_main"):
             self.assertIn('"%s"' % key, source)
 
 

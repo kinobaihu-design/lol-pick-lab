@@ -16,7 +16,15 @@
     WIN_RATE_WARNING_DELTA: -1.5,
     // An OTP win rate (and the Growth "skill pays off" line) only shows with at least this many
     // bot-lane OTP games; below it the page says "too few games". It never changes the OTP score.
-    OTP_MIN_GAMES_SHOWN: 20
+    OTP_MIN_GAMES_SHOWN: 20,
+    // Colored boxes (Meta Score and Comfort) use the same steps as the tiers: 0.5 and 1.5 spreads
+    // (standard deviations) from the average. Kept equal to TIER_BOUNDARIES in scoring/config.py (a test checks).
+    SPREAD_STEPS: { mild: 0.5, strong: 1.5 },
+    // The champion cards the page reads directly (a copy of scoring/cards.json; a test checks they match).
+    CARDS_URL: "data/cards.json",
+    // The page needs a scores file from at least this model version. If the live file is older and the
+    // saved copy is newer, the saved copy is shown (with a notice) until the next collector run.
+    MIN_MODEL_VERSION: "v0.38"
   };
   if (typeof module !== "undefined" && module.exports) module.exports = SETTINGS;
   else root.SETTINGS = SETTINGS;
