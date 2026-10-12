@@ -1,16 +1,22 @@
 # LoL Pick Lab
 
-A free website that ranks League of Legends ADC and support champions every patch, using personal scoring rules on Diamond+ match data from the official Riot Games API.
+A free, non-commercial website for me and a few friends. Every patch it ranks League of Legends bot-lane champions (ADC and APC) using my own scoring rules. The scores come from Diamond+ ranked games collected through Riot's official API with a personal key.
 
-**Planned features**
+**How it works**
 
-1. A personal tier list for ADC (support later)
-2. A draft helper that recommends a pick
+- Games are collected about every 6 hours on GitHub Actions.
+- Each champion gets a Pick Score from its Diamond+ stats and my own comfort ratings.
 
-Build recommendations (items, runes, skill order) may come back later as an extra.
+**Status**
 
-**Status:** the data collector runs on GitHub Actions every 6 hours. The data is on the `data` branch. The scoring code (`scoring/`) recalculates the Pick Score, Meta Score, bans and Growth advisor after every collector save and writes them to `scores/` on the `data` branch. The website isn't built yet.
+- The tier list works, with four tabs: Tier list · Meta · Comfort · Growth.
+- It isn't public yet. It will be hosted on Vercel later.
+- The draft helper, the support tier list and the jungle tier list come later.
 
-Runs on free services: the Riot API (personal key), GitHub Actions for the daily data collection, and Vercel for the website. The Riot API key is stored as a GitHub secret and is never in the code.
+**Privacy**
 
-*LoL Pick Lab isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.*
+- Only combined champion stats are published.
+- No raw match data, no player names or IDs.
+- No data is sold. There are no ads and no payments.
+
+*LoL Pick Lab is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.*
