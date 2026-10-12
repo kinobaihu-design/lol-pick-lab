@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header><h1>Admin</h1></header>
+  <form id="admin-form" autocomplete="off">
+    <p>Type the password, then press the button. The password is asked for every time and is never saved.</p>
+    <p><label for="admin-password">Password</label><br>
+    <input type="password" id="admin-password" autocomplete="current-password" required></p>
+    <p><button type="submit" id="admin-review-done">Mastery review done</button></p>
+    <p id="admin-status" role="status"></p>
+  </form>
+</main>
+<script src="admin.js"></script>
+</body>
+</html>
