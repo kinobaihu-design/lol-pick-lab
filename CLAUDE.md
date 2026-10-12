@@ -351,7 +351,7 @@ Pasted from the owner; the live brief has the full details.
 - Vercel setup (Oct 11): `vercel.json` at the repo root publishes only `site/` (no build, no install) and builds only branch `main` (`ignoreCommand`). Nothing secret on Vercel; the page reads live scores from the `data` branch. (Before that: the repository had no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing was published then.)
 - **v0.40:** the Growth tab has a third, quieter table **Utopy picks** (see "Brief changes v0.40"), and every tab has the Riot legal notice and about line in a footer. `MIN_MODEL_VERSION` is now v0.40.
 - Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
-- Not deployed yet: the owner imports the repo on Vercel by hand (settings in the Vercel setup line above).
+- Deployed on Vercel Oct 11 as baihu-lol-pl.vercel.app (owner imported it by hand; settings in the Vercel setup line above). Collector schedule re-enabled Oct 11 (UTC 02:14 manual run).
 
 ## Project board
 
@@ -373,7 +373,8 @@ Pasted from the owner; the live brief has the full details.
   - [x] Slice 3: tabs Tier list · Meta · Comfort · Growth, Meta Score with Needs a card, Comfort breakdown, Growth advisor with "skill pays off", "too few games" below 20 OTP games (Oct 11, v0.37). Ban suggestions removed from this phase.
 - [ ] Follow Riot's developer rules (v0.40: policies re-read Oct 11, 2026, no change; legal notice + about line footer done; safety audit done, salting done in v0.41; product already registered in the Developer Portal, the owner updates its description): legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [x] Show a "last mastery review: patch X" reminder on the Comfort tab (review every 5–6 patches; v0.42, Oct 11)
-- [ ] Publish on Vercel (project `baihu-lol-pl`, site baihu-lol-pl.vercel.app; repo ready: `vercel.json`, v0.42) and share the link with one friend
+- [x] Publish on Vercel (project `baihu-lol-pl`, site baihu-lol-pl.vercel.app; published and checked by the owner Oct 11: fresh data, no saved-copy notice, 4 tabs OK; `vercel.json`)
+- [ ] Share the link with one friend
 - [ ] Admin page: "Mastery review done" button first, then card editing
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
