@@ -318,7 +318,7 @@ Pasted from the owner; the live brief has the full details.
 Pasted from the owner; the live brief has the full details.
 
 - New: a **"Last mastery review: patch X"** reminder on the Comfort tab only. The one value lives in `scoring/review.json` (`last_mastery_review_patch`, starts at "16.20"), next to the cards, with a copy in `site/data/review.json` that a test keeps equal (copy it again when it changes). Not in the scoring code, so a future admin page can change just this value. Count = current minor − review minor in the same season: 0–4 grey (information), exactly 5 amber ("Mastery review due soon (5 patches since 16.20)"), 6 or more red ("Mastery review overdue (N patches since 16.20)"), new season red ("New season: mastery review due"), unknown current patch grey line with no count. Hover help: "Review your mastery levels every 5–6 patches. Tell Claude Code 'mastery review done on patch X' to reset (admin button coming later)." Code: `masteryReview` in `site/format.js`; tests in `tests/test_site.py` (`MasteryReviewTests`) and `tests/site_format.test.js`. **To reset: when the owner says "mastery review done on patch X", change `scoring/review.json` and copy it to `site/data/review.json`.**
-- New board item (Phase 4, later, after Vercel publishing): **Admin page**, with a "Mastery review done" button first, then card editing. It replaces the open question about editing cards.
+- New board item (moved to Phase 2, right after "Publish on Vercel"): **Admin page**, with a "Mastery review done" button first, then card editing. It replaces the open question about editing cards.
 - No change to the Pick Score.
 
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
@@ -348,10 +348,10 @@ Pasted from the owner; the live brief has the full details.
   - **Which scores file:** the live file is used; only if it is from an older model version than `MIN_MODEL_VERSION` (settings) and the saved copy is newer, the saved copy is shown with a notice until the next collector run.
   - The old, unused ban code (Ban threat) was removed from `scoring/` and its tests.
 - **Local preview:** the preview program can't read the Documents folder, so it serves a copy at `~/.lol-pick-lab-preview` (see `.claude/launch.json`, port 8124). **Run `scripts/sync_preview.sh` after every change to `site/`**, or the preview shows old code (this is why the slice-2 hover help looked missing: the old preview served a frozen copy).
-- Vercel check (Oct 11): the repository has no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing is published yet.
+- Vercel setup (Oct 11): `vercel.json` at the repo root publishes only `site/` (no build, no install) and builds only branch `main` (`ignoreCommand`). Nothing secret on Vercel; the page reads live scores from the `data` branch. (Before that: the repository had no `vercel.json`, no webhooks, no deployments and no Vercel check on `main`, so a push does not deploy the site. Nothing was published then.)
 - **v0.40:** the Growth tab has a third, quieter table **Utopy picks** (see "Brief changes v0.40"), and every tab has the Riot legal notice and about line in a footer. `MIN_MODEL_VERSION` is now v0.40.
 - Tests: `tests/test_site.py` and `tests/site_format.test.js` (the Python run calls Node for the JavaScript tests when Node is installed).
-- Not deployed. Check before pushing to `main` whether Vercel would publish it (no `vercel.json` yet).
+- Not deployed yet: the owner imports the repo on Vercel by hand (settings in the Vercel setup line above).
 
 ## Project board
 
@@ -373,7 +373,8 @@ Pasted from the owner; the live brief has the full details.
   - [x] Slice 3: tabs Tier list · Meta · Comfort · Growth, Meta Score with Needs a card, Comfort breakdown, Growth advisor with "skill pays off", "too few games" below 20 OTP games (Oct 11, v0.37). Ban suggestions removed from this phase.
 - [ ] Follow Riot's developer rules (v0.40: policies re-read Oct 11, 2026, no change; legal notice + about line footer done; safety audit done, salting done in v0.41; product already registered in the Developer Portal, the owner updates its description): legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
 - [x] Show a "last mastery review: patch X" reminder on the Comfort tab (review every 5–6 patches; v0.42, Oct 11)
-- [ ] Publish on Vercel and share the link with one friend
+- [ ] Publish on Vercel (project `baihu-lol-pl`, site baihu-lol-pl.vercel.app; repo ready: `vercel.json`, v0.42) and share the link with one friend
+- [ ] Admin page: "Mastery review done" button first, then card editing
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
 **Phase 3, draft helper**
@@ -383,7 +384,6 @@ Pasted from the owner; the live brief has the full details.
 **Phase 4, later**
 - [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
 - [ ] Ban suggestions (moved here from Phase 2 in v0.37)
-- [ ] Admin page (after Vercel publishing): "Mastery review done" button first, then card editing
 - [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
 - [x] Make cards for new bot-lane champions that pass the filters (Aurelion Sol, Karthus, Swain, Veigar, Vladimir, Seraphine, Mel; done Oct 11; more if the "Needs a card" list grows)
 - [ ] Apply for a production key if the site grows beyond friends
