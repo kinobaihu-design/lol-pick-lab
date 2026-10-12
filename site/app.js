@@ -49,6 +49,14 @@
     }).then(function (file) { return Array.isArray(file.cards) ? file.cards : []; }, function () { return []; });
   }
 
+  // The one setting for the mastery review reminder; if it can't be read the line says "unknown".
+  function loadReview() {
+    return fetch(S.REVIEW_URL, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (file) { return file.last_mastery_review_patch; }, function () { return null; });
+  }
+
   function drawHeader(data, fallback, how) {
     document.getElementById("patch").textContent = "Patch " + data.patch;
     var when = new Date(data.generated);
@@ -446,7 +454,7 @@
   }
 
   // The page always opens on the Tier list, sorted by Pick Score (so by tier); sorts are not remembered.
-  function start(data, cards) {
+  function start(data, cards, reviewPatch) {
     state.data = data;
     var picks = data.pick_score_list;
     var metaList = data.meta_score_list || picks;
@@ -460,6 +468,11 @@
     state.metaRankOf = rankMap(metaList, "meta_score");
     state.comfortRankOf = rankMap(picks, "comfort");
     picks.forEach(function (c) { state.byId[c.id] = c; });
+
+    var review = F.masteryReview(reviewPatch, data.patch);
+    var reviewLine = document.getElementById("mastery-review");
+    reviewLine.textContent = review.text;
+    reviewLine.className = "notice " + review.level;
 
     wireTips();
     wireTabs();
@@ -533,10 +546,10 @@
     drawNotRanked(data);
   }
 
-  Promise.all([loadScores(), loadCards()]).then(function (both) {
+  Promise.all([loadScores(), loadCards(), loadReview()]).then(function (both) {
     var result = both[0];
     drawHeader(result.data, result.fallback, result);
-    start(result.data, both[1]);
+    start(result.data, both[1], both[2]);
     document.getElementById("loading").hidden = true;
     document.getElementById("content").hidden = false;
   }, function () {

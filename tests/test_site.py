@@ -502,6 +502,40 @@ class SiteDataTests(unittest.TestCase):
             self.assertIn('"%s"' % key, source)
 
 
+class MasteryReviewTests(unittest.TestCase):
+    """v0.42: the "last mastery review" reminder lives on the Comfort tab only, with one setting next to the cards."""
+
+    def test_one_setting_next_to_the_cards_and_the_page_copy_matches(self):
+        with open(os.path.join(ROOT, "scoring", "review.json"), encoding="utf-8") as f:
+            original = json.load(f)
+        self.assertEqual(original, {"last_mastery_review_patch": "16.20"})
+        self.assertEqual(json.loads(read("data/review.json")), original)
+        self.assertIn('REVIEW_URL: "data/review.json"', read("settings.js"))
+        for code in ("app.js", "format.js"):                    # the value is never written into the page code
+            self.assertNotIn("last_mastery_review_patch", read(code).replace("file.last_mastery_review_patch", ""))
+        scoring_code = ""
+        for name in ("model.py", "comfort.py", "config.py"):
+            with open(os.path.join(ROOT, "scoring", name), encoding="utf-8") as f:
+                scoring_code += f.read()
+        self.assertNotIn("mastery_review", scoring_code)      # no score can depend on it
+
+    def test_the_line_is_only_on_the_comfort_tab(self):
+        html = read("index.html")
+        self.assertEqual(html.count('id="mastery-review"'), 1)
+        panels = dict(re.findall(r'<section id="tab-(\w+)".*?>(.*?)</section>', html, re.S))
+        self.assertIn('id="mastery-review"', panels["comfort"])
+        for other in ("tier", "meta", "growth"):
+            self.assertNotIn("mastery-review", panels[other])
+            self.assertNotIn("mastery review", panels[other].lower())
+        self.assertIn('data-tip-key="mastery_review"', panels["comfort"])
+
+    def test_hover_help_text(self):
+        help_text = read("help.js")
+        self.assertIn("Review your mastery levels every 5", help_text)
+        self.assertIn("mastery review done on patch X", help_text)
+        self.assertIn("admin button coming later", help_text)
+
+
 @unittest.skipUnless(shutil.which("node"), "Node is not installed")
 class SiteFormatTests(unittest.TestCase):
     def test_javascript_helpers(self):

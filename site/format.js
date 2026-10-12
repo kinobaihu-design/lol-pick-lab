@@ -439,6 +439,27 @@
       typeof data.generated === "string";
   }
 
+  // ---- mastery review reminder (Comfort tab only) ----
+  // "16.20" -> {season: 16, minor: 20}; anything else -> null.
+  function parsePatch(text) {
+    var m = /^\s*(\d+)\.(\d+)\s*$/.exec(String(text == null ? "" : text));
+    return m ? { season: Number(m[1]), minor: Number(m[2]) } : null;
+  }
+
+  // Returns {level: "quiet" | "warn" | "bad", text}. Quiet = grey information, warn = amber (due soon, 5 patches),
+  // bad = red (6+ patches, or the season number changed). Never throws: an unknown patch gives the grey line only.
+  function masteryReview(reviewPatch, currentPatch) {
+    var line = "Last mastery review: patch " + reviewPatch;
+    var review = parsePatch(reviewPatch), now = parsePatch(currentPatch);
+    if (!review) return { level: "quiet", text: "Last mastery review: unknown" };
+    if (!now) return { level: "quiet", text: line };
+    if (now.season !== review.season) return { level: "bad", text: "New season: mastery review due" };
+    var since = Math.max(0, now.minor - review.minor);
+    if (since >= 6) return { level: "bad", text: "Mastery review overdue (" + since + " patches since " + reviewPatch + ")" };
+    if (since === 5) return { level: "warn", text: "Mastery review due soon (5 patches since " + reviewPatch + ")" };
+    return { level: "quiet", text: line };
+  }
+
   var api = { number: number, signed: signed, games: games, ageHours: ageHours, isStale: isStale,
               describeAge: describeAge, ranked: ranked, tierText: tierText, looksLikeScores: looksLikeScores,
               masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
@@ -452,7 +473,8 @@
               typeText: typeText, mainTypeText: mainTypeText, secondaryTypeText: secondaryTypeText,
               difficultyText: difficultyText, masteryPointsText: masteryPointsText, flexText: flexText,
               needsCard: needsCard, otpWinRateText: otpWinRateText, skillDelta: skillDelta,
-              skillPaysOffText: skillPaysOffText, growthTipText: growthTipText, growthHeadline: growthHeadline };
+              skillPaysOffText: skillPaysOffText, growthTipText: growthTipText, growthHeadline: growthHeadline,
+              parsePatch: parsePatch, masteryReview: masteryReview };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Format = api;
 })(typeof window !== "undefined" ? window : this);

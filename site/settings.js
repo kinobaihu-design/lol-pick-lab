@@ -23,6 +23,8 @@
     SPREAD_STEPS: { mild: 0.5, strong: 1.5 },
     // The champion cards the page reads directly (a copy of scoring/cards.json; a test checks they match).
     CARDS_URL: "data/cards.json",
+    // The one value for the mastery review reminder (a copy of scoring/review.json; a test checks they match).
+    REVIEW_URL: "data/review.json",
     // The page needs a scores file from at least this model version. If the live file is older and the
     // saved copy is newer, the saved copy is shown (with a notice) until the next collector run.
     MIN_MODEL_VERSION: "v0.40"

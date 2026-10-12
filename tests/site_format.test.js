@@ -367,3 +367,22 @@ test("Utopy picks table sorts by every column", () => {
   assert.strictEqual(by("u_mastery", "asc"), "ZedKaiBob");
   assert.strictEqual(by("u_skill", "desc"), "KaiBobZed");
 });
+
+test("mastery review: grey up to 4 patches, amber at 5, red at 6 or more", () => {
+  const r = (now) => F.masteryReview("16.20", now);
+  assert.deepStrictEqual(r("16.20"), { level: "quiet", text: "Last mastery review: patch 16.20" });
+  assert.strictEqual(r("16.24").level, "quiet");
+  assert.strictEqual(r("16.24").text, "Last mastery review: patch 16.20");
+  assert.deepStrictEqual(r("16.25"), { level: "warn", text: "Mastery review due soon (5 patches since 16.20)" });
+  assert.deepStrictEqual(r("16.26"), { level: "bad", text: "Mastery review overdue (6 patches since 16.20)" });
+  assert.strictEqual(r("16.31").text, "Mastery review overdue (11 patches since 16.20)");
+});
+
+test("mastery review: a new season is red, an unknown patch is a grey line with no count and no error", () => {
+  assert.deepStrictEqual(F.masteryReview("16.20", "17.2"), { level: "bad", text: "New season: mastery review due" });
+  for (const unknown of [undefined, null, "", "soon", "16"]) {
+    assert.deepStrictEqual(F.masteryReview("16.20", unknown), { level: "quiet", text: "Last mastery review: patch 16.20" });
+  }
+  assert.strictEqual(F.masteryReview(null, "16.25").level, "quiet");
+  assert.strictEqual(F.masteryReview("16.20", "16.18").level, "quiet");   // a review "from the future" never nags
+});

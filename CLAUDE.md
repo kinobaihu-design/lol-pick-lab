@@ -313,6 +313,14 @@ Pasted from the owner; the live brief has the full details.
 - Tests: `tests/test_site.py` (`LegalNoticeTests`: notice present with the exact wording, never inside one tab or a hidden element) and `tests/test_safety.py` (fails on any `RGAPI-` key-shaped text in the project files or in the main branch history).
 - **Safety audit, Oct 11 (report only; nothing was deleted or rewritten):** no key or key-shaped text in the code, any git branch's history, the unpacked `data` and `data-backup` files, the site files or the 42 GitHub Actions logs. Every Riot call is HTTPS (`collector/riot.py`), the key travels in the `X-Riot-Token` header and comes only from the `RIOT_API_KEY` secret. The site has no images and no Riot logos. Open finding: player codes were an unsalted truncated SHA-256 of the PUUID, so anyone who knew a player's PUUID could look that player up in the public `data` branch. Fixed in v0.41 with a secret key (see "Brief changes v0.41").
 
+## Brief changes v0.42 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- New: a **"Last mastery review: patch X"** reminder on the Comfort tab only. The one value lives in `scoring/review.json` (`last_mastery_review_patch`, starts at "16.20"), next to the cards, with a copy in `site/data/review.json` that a test keeps equal (copy it again when it changes). Not in the scoring code, so a future admin page can change just this value. Count = current minor − review minor in the same season: 0–4 grey (information), exactly 5 amber ("Mastery review due soon (5 patches since 16.20)"), 6 or more red ("Mastery review overdue (N patches since 16.20)"), new season red ("New season: mastery review due"), unknown current patch grey line with no count. Hover help: "Review your mastery levels every 5–6 patches. Tell Claude Code 'mastery review done on patch X' to reset (admin button coming later)." Code: `masteryReview` in `site/format.js`; tests in `tests/test_site.py` (`MasteryReviewTests`) and `tests/site_format.test.js`. **To reset: when the owner says "mastery review done on patch X", change `scoring/review.json` and copy it to `site/data/review.json`.**
+- New board item (Phase 4, later, after Vercel publishing): **Admin page**, with a "Mastery review done" button first, then card editing. It replaces the open question about editing cards.
+- No change to the Pick Score.
+
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
 
 - Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
@@ -364,7 +372,7 @@ Pasted from the owner; the live brief has the full details.
   - [x] Slice 2: mastery shown as 1–5 colored dots under Comfort, trait badges, sample-size label, data-freshness label, OTP counts, ⚠ win-rate warning, column sorting, "Carded but not ranked" (Oct 11)
   - [x] Slice 3: tabs Tier list · Meta · Comfort · Growth, Meta Score with Needs a card, Comfort breakdown, Growth advisor with "skill pays off", "too few games" below 20 OTP games (Oct 11, v0.37). Ban suggestions removed from this phase.
 - [ ] Follow Riot's developer rules (v0.40: policies re-read Oct 11, 2026, no change; legal notice + about line footer done; safety audit done, salting done in v0.41; product already registered in the Developer Portal, the owner updates its description): legal notice on the site ("not endorsed by Riot Games"), personal key for a small private community, free and non-commercial, no data sold, key never exposed. Claude checks Riot's current policy page before publishing
-- [ ] Show a "last mastery review: patch X" reminder on the site (review every 5–6 patches)
+- [x] Show a "last mastery review: patch X" reminder on the Comfort tab (review every 5–6 patches; v0.42, Oct 11)
 - [ ] Publish on Vercel and share the link with one friend
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
@@ -375,6 +383,7 @@ Pasted from the owner; the live brief has the full details.
 **Phase 4, later**
 - [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
 - [ ] Ban suggestions (moved here from Phase 2 in v0.37)
+- [ ] Admin page (after Vercel publishing): "Mastery review done" button first, then card editing
 - [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
 - [x] Make cards for new bot-lane champions that pass the filters (Aurelion Sol, Karthus, Swain, Veigar, Vladimir, Seraphine, Mel; done Oct 11; more if the "Needs a card" list grows)
 - [ ] Apply for a production key if the site grows beyond friends
@@ -418,6 +427,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.42** (Oct 11, 2026): no score change. "Last mastery review: patch X" reminder on the Comfort tab (one setting in `scoring/review.json`); Admin page added to the board (later).
 - **v0.41** (Oct 11, 2026): no score change. Player codes get a secret key (`PLAYER_CODE_SALT`); old codes converted without losing data; `data` and `data-backup` history reset; Riot policy dates logged (general May 29, 2025; League game policy Aug 21, 2026).
 - **v0.40** (Oct 11, 2026): no score change. Growth tab gets the third table "Utopy picks" (long-term goals, information only). Riot developer rules plan: legal notice and about line footer on all tabs, key-scan and legal-notice tests, safety audit.
 - **v0.39** (Oct 11, 2026): no score change. Growth advisor uses the next mastery level only (both lists); "Could reach A or S" becomes "Next step to A or S" with a "closest" line when empty; ceiling at Main kept as information only; sample-size labels Low under 10,000, Medium 10,000–29,999, High 30,000+.
