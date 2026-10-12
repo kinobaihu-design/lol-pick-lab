@@ -18,6 +18,10 @@ COLUMNS = ["rank", "champion", "tier", "Pick Score", "Comfort", "Stats", "OTP", 
 sys.path.insert(0, ROOT)
 from scoring import comfort, config, model   # noqa: E402
 
+# The champion cards as they were when the saved scores copy and the brief numbers were made. The real cards can now
+# be edited from the admin page, so tests that compare with those saved numbers read this frozen copy instead.
+CARDS_SNAPSHOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "cards_snapshot.json")
+
 
 def read(name):
     with open(os.path.join(SITE, name), encoding="utf-8") as f:
@@ -336,7 +340,7 @@ class SiteDataTests(unittest.TestCase):
             self.assertTrue(entry["failed"], entry["name"])
 
     def cards_by_name(self):
-        return {model.normalise(c["riot_name"]): c for c in comfort.load_cards()}
+        return {model.normalise(c["riot_name"]): c for c in comfort.load_cards(CARDS_SNAPSHOT)}
 
     def test_comfort_tab_numbers_are_the_ones_the_pick_score_uses(self):
         """Every number on the Comfort tab is read from the file; recompute each with the Comfort code and compare."""
@@ -533,7 +537,10 @@ class MasteryReviewTests(unittest.TestCase):
         help_text = read("help.js")
         self.assertIn("Review your mastery levels every 5", help_text)
         self.assertIn("mastery review done on patch X", help_text)
-        self.assertIn("admin button coming later", help_text)
+        self.assertIn("review button on the admin page", help_text)
+        self.assertNotIn("coming later", help_text)
+        self.assertNotIn("/admin", help_text)                  # the address stays hidden
+        self.assertIn("Editing cards never resets", help_text)
 
 
 @unittest.skipUnless(shutil.which("node"), "Node is not installed")

@@ -29,7 +29,7 @@
     needs_card: "Champions that pass the filters but have no card, sorted by Meta Score. Make a card to get a Pick Score.",
 
     // ---- Comfort tab ----
-    mastery_review: "Review your mastery levels every 5\u20136 patches. Tell Claude Code 'mastery review done on patch X' to reset (admin button coming later).",
+    mastery_review: "Review your mastery levels every 5\u20136 patches. When you have done it, press the review button on the admin page, or tell Claude Code 'mastery review done on patch X'. Editing cards never resets this reminder.",
     c_champion: "A champion with a card. Type, strength, traits and mastery are read straight from the cards.",
     c_comfort: "The final Comfort number, the same one the tier list uses (worth 52.5% of the Pick Score). The box is green above the average Comfort and red below, stronger each 0.5 and 1.5 spreads away.",
     trait_score: "Sum of priority × level over the champion's traits (Low 0.5, Mid 1, High 1.5); the badges show each trait and its level. The Kit adjustment compares it with the patch average.",

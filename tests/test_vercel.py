@@ -71,14 +71,15 @@ class AdminPageTests(unittest.TestCase):
         for word in ("ADMIN_PASSWORD", "GITHUB_TOKEN", "ghp_", "github_pat_", "process.env", "localStorage",
                      "sessionStorage", "document.cookie"):
             self.assertNotIn(word, text)
-        self.assertEqual(self.read("site", "admin.html").count("<button"), 1)
+        self.assertEqual(self.read("site", "admin.html").count("<button"), 1)   # the cards' Update buttons are added by admin.js
         self.assertIn("Mastery review done", self.read("site", "admin.html"))
         self.assertIn('type="password"', self.read("site", "admin.html"))
 
     def test_the_helper_is_the_only_extra_published_code_and_reads_secrets_from_the_environment(self):
-        self.assertEqual(sorted(os.listdir(os.path.join(ROOT, "api"))), ["admin-review.js"])
+        self.assertEqual(sorted(os.listdir(os.path.join(ROOT, "api"))), ["admin-card.js", "admin-review.js"])
         self.assertIn("process.env", self.read("api", "admin-review.js"))
-        logic = self.read("lib", "admin-review.js")
+        self.assertIn("process.env", self.read("api", "admin-card.js"))
+        logic = "".join(self.read("lib", n) for n in sorted(os.listdir(os.path.join(ROOT, "lib"))))
         self.assertNotRegex(logic, r"(ghp_|github_pat_)[A-Za-z0-9_]{10,}")
         self.assertIn("timingSafeEqual", logic)
         config = json.loads(self.read("vercel.json"))
@@ -86,7 +87,7 @@ class AdminPageTests(unittest.TestCase):
         self.assertIn('"main"', config["ignoreCommand"])
 
     def test_the_collector_and_data_files_are_not_touched_by_the_helper(self):
-        logic = self.read("lib", "admin-review.js")
+        logic = "".join(self.read("lib", n) for n in sorted(os.listdir(os.path.join(ROOT, "lib"))))
         for word in ("collector/", "state/", "collect.yml", "/.github", "\".github"):
             self.assertNotIn(word, logic)
 

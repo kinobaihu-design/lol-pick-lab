@@ -6,18 +6,41 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Admin</title>
 <link rel="stylesheet" href="style.css">
+<style>
+  .admin-card { border: 1px solid #8884; border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
+  .admin-card h3 { margin: 0 0 6px; font-size: 1rem; }
+  .admin-card h3 small { font-weight: normal; opacity: .7; }
+  .admin-fields { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  .admin-fields label { display: flex; flex-direction: column; font-size: .8rem; }
+  .admin-fields select { font-size: .9rem; }
+  .admin-preview { margin: 8px 0 4px; font-size: .9rem; min-height: 1.2em; }
+  .admin-result { font-size: .9rem; margin: 4px 0 0; }
+  .admin-changed select.changed { outline: 2px solid #e0a000; }
+</style>
 </head>
 <body>
 <main>
   <header><h1>Admin</h1></header>
+  <p>Type the password, then press a button. The password is asked for every time and is never saved: the box
+  empties after each action.</p>
+  <p><label for="admin-password">Password</label><br>
+  <input type="password" id="admin-password" autocomplete="current-password"></p>
+
+  <h2>Mastery review</h2>
   <form id="admin-form" autocomplete="off">
-    <p>Type the password, then press the button. The password is asked for every time and is never saved.</p>
-    <p><label for="admin-password">Password</label><br>
-    <input type="password" id="admin-password" autocomplete="current-password" required></p>
     <p><button type="submit" id="admin-review-done">Mastery review done</button></p>
     <p id="admin-status" role="status"></p>
   </form>
+
+  <h2>Champion cards</h2>
+  <p>Change a champion's mastery or its traits, check the preview, then press Update. Each change is saved as its
+  own commit on GitHub (that list is the edit history), and the scores are recalculated within a few minutes.
+  Editing a card never resets the mastery review reminder.</p>
+  <p id="admin-cards-status" role="status">Loading the cards&hellip;</p>
+  <div id="admin-cards"></div>
 </main>
+<script src="settings.js"></script>
+<script src="comfort-preview.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

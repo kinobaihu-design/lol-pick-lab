@@ -1,0 +1,89 @@
+name: Rescore after a card edit
+
+# Runs when a champion card changes on main (the admin page edits them). It reapplies the scoring to the data
+# already saved on the `data` branch and replaces only the scores. It makes ZERO Riot API requests and has no
+# access to the Riot key or the player-code secret.
+#
+# How it stays out of the collector's way:
+#  * If a collector run is going (or waiting), this run stops at once. The collector reads the newest cards
+#    from main every time it scores (at least once an hour), so the edit shows up there anyway.
+#  * Otherwise it saves the scores with --force-with-lease: if the data branch changed in the meantime (a
+#    collector started), nothing is overwritten.
+#  * Runs for quick edits one after another replace each other, so the newest cards always win.
+# If anything fails, the old scores stay on the site and the next collector run fixes it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scoring/cards.json
+      - site/data/cards.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: rescore
+  cancel-in-progress: true
+
+jobs:
+  rescore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Skip while the collector is running
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          busy=0
+          for status in in_progress queued; do
+            n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow collect.yml --status "$status" --json databaseId --jq length)
+            busy=$((busy + n))
+          done
+          if [ "$busy" -gt 0 ]; then
+            echo "A collector run is going or waiting. It reads the newest cards when it scores, so nothing to do here."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Load the saved data
+        id: load
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/data"
+          git fetch --no-tags --depth=1 origin data:refs/remotes/origin/data
+          git archive refs/remotes/origin/data | tar -x -C "$RUNNER_TEMP/data"
+          echo "previous=$(git rev-parse refs/remotes/origin/data)" >> "$GITHUB_OUTPUT"
+
+      - name: Rescore (no Riot requests)
+        if: steps.gate.outputs.skip != 'true'
+        run: python -m scoring --data-dir "$RUNNER_TEMP/data" --cards-file scoring/cards.json --keep-generated
+
+      - name: Save the new scores
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          PREVIOUS: ${{ steps.load.outputs.previous }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          export GIT_WORK_TREE="$RUNNER_TEMP/data" GIT_INDEX_FILE="$RUNNER_TEMP/rescore-index"
+          git add -A
+          tree=$(git write-tree)
+          commit=$(git commit-tree "$tree" -m "Rescored after a card edit $(date -u +%Y-%m-%dT%H:%M:%SZ)")
+          if git push --force-with-lease="refs/heads/data:$PREVIOUS" origin "${commit}:refs/heads/data"; then
+            echo "New scores saved."
+          else
+            echo "The data branch changed while rescoring (a collector saved). Nothing was overwritten; its scoring has the newest cards."
+          fi

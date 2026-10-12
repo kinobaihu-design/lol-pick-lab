@@ -12,6 +12,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scoring import comfort, config, model  # noqa: E402
 
+# The champion cards as they were when the saved scores copy and the brief numbers were made. The real cards can now
+# be edited from the admin page, so tests that compare with those saved numbers read this frozen copy instead.
+CARDS_SNAPSHOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "cards_snapshot.json")
+
 
 def write(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -41,7 +45,7 @@ def make_patch(root, name, champions, average, bottom_total, participants):
 
 class CardTests(unittest.TestCase):
     def test_every_card_matches_the_brief(self):
-        cards = comfort.load_cards()
+        cards = comfort.load_cards(CARDS_SNAPSHOT)
         self.assertEqual(len(cards), 39)
         average, rows, problems = comfort.self_check(cards, tolerance=0.15)   # the brief rounds the kit adjustment to 1 decimal
         self.assertAlmostEqual(average, 13.9, places=1)
@@ -49,14 +53,14 @@ class CardTests(unittest.TestCase):
         self.assertLess(max(abs(r["comfort_diff"]) for r in rows), 0.15)
 
     def test_aphelios_worked_example(self):
-        card = next(c for c in comfort.load_cards() if c["name"] == "Aphelios")
+        card = next(c for c in comfort.load_cards(CARDS_SNAPSHOT) if c["name"] == "Aphelios")
         parts = comfort.comfort(card, 13.7)
         self.assertAlmostEqual(parts["base"], 68.0)
         self.assertAlmostEqual(parts["difficulty_adjustment"], -3.0)
         self.assertAlmostEqual(parts["comfort"], 66.7, delta=0.1)   # the brief rounds the kit adjustment to 1.8
 
     def test_secondary_type_and_caps(self):
-        cards = {c["name"]: c for c in comfort.load_cards()}
+        cards = {c["name"]: c for c in comfort.load_cards(CARDS_SNAPSHOT)}
         self.assertAlmostEqual(comfort.type_points(cards["Vayne"])[1], 3.5)      # best secondary counts
         self.assertAlmostEqual(comfort.type_points(cards["Sivir"])[1], 0.0)      # secondary is lower
         self.assertEqual(comfort.comfort(cards["Hwei"], 13.656)["kit_adjustment"], 5.0)    # capped
@@ -290,7 +294,7 @@ class GrowthAdvisorRuleTests(unittest.TestCase):
         self.assertEqual(model.growth_advisor({}, {}, [{"pick_score": 80}, {"pick_score": 70}], 13.9, {}), [])
 
     def test_a_tip_must_beat_the_third_best_pick(self):
-        cards = {c["riot_name"]: c for c in comfort.load_cards()}
+        cards = {c["riot_name"]: c for c in comfort.load_cards(CARDS_SNAPSHOT)}
         average = comfort.average_trait_score(list(cards.values()))
         names = ["Sivir", "Jinx", "Caitlyn", "Kalista"]
         eligible, carded = {}, {}
@@ -323,7 +327,7 @@ class NextStepTests(unittest.TestCase):
     STATS = {"average_pick_score": 70.0, "spread": 5.0}
 
     def setUp(self):
-        self.cards = {c["riot_name"]: c for c in comfort.load_cards()}
+        self.cards = {c["riot_name"]: c for c in comfort.load_cards(CARDS_SNAPSHOT)}
         self.average = comfort.average_trait_score(list(self.cards.values()))
 
     def champion(self, i, name, stats, tier, mastery=None):

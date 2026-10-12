@@ -1,0 +1,1294 @@
+{
+ "_about": "Champion cards from project brief v0.35 (bot lane: ADC and APC). Edit this file to change a card. A trait that is left out means the champion truly doesn't have it. 'brief' holds the numbers printed in the brief: the self-check compares the code's results with them. Mastery is one of: main, good, average, below_average, never_played.",
+ "cards": [
+  {
+   "name": "Sivir",
+   "riot_name": "Sivir",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "peel",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "utility",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "main",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "high",
+    "aoe": "high",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "mid"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 17.5,
+    "comfort": 98.7
+   }
+  },
+  {
+   "name": "Caitlyn",
+   "riot_name": "Caitlyn",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "mid",
+   "secondary_types": [
+    {
+     "type": "lane_bully",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "mid",
+    "burst": "mid",
+    "poke": "mid",
+    "vision": "mid"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1.5
+   },
+   "range": "long",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 13.0,
+    "comfort": 93.2
+   }
+  },
+  {
+   "name": "Senna",
+   "riot_name": "Senna",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "utility",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "hypercarry",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "high",
+    "aoe": "low",
+    "cc": "mid",
+    "sustain": "high",
+    "burst": "low",
+    "poke": "low",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 1
+   },
+   "range": "long",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 15.0,
+    "comfort": 88.2
+   }
+  },
+  {
+   "name": "Jinx",
+   "riot_name": "Jinx",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "mid",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "low",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "long",
+   "flexible_build": false,
+   "note": "Long because rockets can be switched on anytime",
+   "brief": {
+    "trait_score": 14.5,
+    "comfort": 87.9
+   }
+  },
+  {
+   "name": "Lux",
+   "riot_name": "Lux",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "lane_bully",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "mid",
+    "burst": "high",
+    "poke": "high",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 19.0,
+    "comfort": 87.6
+   }
+  },
+  {
+   "name": "Tristana",
+   "riot_name": "Tristana",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "hypercarry",
+     "strength": "low"
+    }
+   ],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "mid",
+    "aoe": "mid",
+    "cc": "low",
+    "sustain": "low",
+    "burst": "high",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "long",
+   "flexible_build": false,
+   "note": "Long because her range grows with level",
+   "brief": {
+    "trait_score": 12.0,
+    "comfort": 86.8
+   }
+  },
+  {
+   "name": "Jhin",
+   "riot_name": "Jhin",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "utility",
+   "main_strength": "mid",
+   "secondary_types": [],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "high",
+    "sustain": "low",
+    "burst": "high",
+    "poke": "mid",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 14.0,
+    "comfort": 86.3
+   }
+  },
+  {
+   "name": "Ziggs",
+   "riot_name": "Ziggs",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "lane_bully",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "mid",
+    "aoe": "high",
+    "cc": "low",
+    "burst": "mid",
+    "poke": "high"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1.5
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Wave clear High confirmed",
+   "brief": {
+    "trait_score": 18.0,
+    "comfort": 86.2
+   }
+  },
+  {
+   "name": "Miss Fortune",
+   "riot_name": "MissFortune",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "lane_bully",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "low",
+    "sustain": "low",
+    "burst": "high",
+    "poke": "high",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 1,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Poke High is the owner's call (her Q is below the 1,000-range rule)",
+   "brief": {
+    "trait_score": 16.0,
+    "comfort": 85.1
+   }
+  },
+  {
+   "name": "Syndra",
+   "riot_name": "Syndra",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "peel",
+     "strength": "low"
+    }
+   ],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "high",
+    "burst": "high",
+    "poke": "high",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 15.5,
+    "comfort": 84.4
+   }
+  },
+  {
+   "name": "Lucian",
+   "riot_name": "Lucian",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "lane_bully",
+     "strength": "low"
+    }
+   ],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "low",
+    "aoe": "low",
+    "sustain": "mid",
+    "burst": "high",
+    "poke": "low",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 9.5,
+    "comfort": 83.5
+   }
+  },
+  {
+   "name": "Ashe",
+   "riot_name": "Ashe",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "utility",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "high",
+    "aoe": "low",
+    "cc": "high",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "mid",
+    "vision": "high"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "long",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 16.0,
+    "comfort": 82.4
+   }
+  },
+  {
+   "name": "Smolder",
+   "riot_name": "Smolder",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "mid",
+   "secondary_types": [
+    {
+     "type": "mobility",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "mid",
+    "cc": "low",
+    "sustain": "low",
+    "burst": "mid",
+    "poke": "mid"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 13.5,
+    "comfort": 81.8
+   }
+  },
+  {
+   "name": "Ezreal",
+   "riot_name": "Ezreal",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "low",
+    "aoe": "low",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "high"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 2.5
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 8.0,
+    "comfort": 81.9
+   }
+  },
+  {
+   "name": "Corki",
+   "riot_name": "Corki",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "mid",
+   "secondary_types": [
+    {
+     "type": "lane_bully",
+     "strength": "low"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "mid",
+    "burst": "mid",
+    "poke": "mid",
+    "vision": "mid"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 12.5,
+    "comfort": 81.6
+   }
+  },
+  {
+   "name": "Twitch",
+   "riot_name": "Twitch",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "low",
+    "sustain": "low",
+    "burst": "high",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "His R range bonus is short-lived: not counted",
+   "brief": {
+    "trait_score": 15.0,
+    "comfort": 81.0
+   }
+  },
+  {
+   "name": "Hwei",
+   "riot_name": "Hwei",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "peel",
+     "strength": "low"
+    }
+   ],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "high",
+    "aoe": "high",
+    "cc": "high",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "high",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 22.0,
+    "comfort": 80.4
+   }
+  },
+  {
+   "name": "Xayah",
+   "riot_name": "Xayah",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "peel",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "hypercarry",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "low",
+    "aoe": "mid",
+    "cc": "mid",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Brief says her Hypercarry strength is 'Mid or Low'; Mid used. It makes no difference because 80 x 97.5% is still below Peel's 90",
+   "brief": {
+    "trait_score": 14.0,
+    "comfort": 80.0
+   }
+  },
+  {
+   "name": "Viktor",
+   "riot_name": "Viktor",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "low",
+    "burst": "low",
+    "poke": "high"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 15.5,
+    "comfort": 78.4
+   }
+  },
+  {
+   "name": "Kalista",
+   "riot_name": "Kalista",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "mid",
+    "aoe": "low",
+    "cc": "mid",
+    "sustain": "low",
+    "burst": "low",
+    "poke": "low",
+    "vision": "mid"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 12.0,
+    "comfort": 77.9
+   }
+  },
+  {
+   "name": "Yunara",
+   "riot_name": "Yunara",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "mobility",
+     "strength": "low"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "low",
+    "sustain": "low",
+    "burst": "mid",
+    "poke": "low",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 14.5,
+    "comfort": 75.7
+   }
+  },
+  {
+   "name": "Zeri",
+   "riot_name": "Zeri",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "hypercarry",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "mid",
+    "aoe": "mid",
+    "cc": "low",
+    "sustain": "low",
+    "burst": "mid",
+    "poke": "mid"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Owner's difficulty not set: Riot's rating used for now",
+   "brief": {
+    "trait_score": 12.0,
+    "comfort": 74.3
+   }
+  },
+  {
+   "name": "Varus",
+   "riot_name": "Varus",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "utility",
+     "strength": "low"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "mid",
+    "sustain": "low",
+    "burst": "mid",
+    "poke": "high",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 1,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": true,
+   "note": "Flexible build (attacks or poke): beta flexibility bonus",
+   "brief": {
+    "trait_score": 13.0,
+    "comfort": 73.9
+   }
+  },
+  {
+   "name": "Akshan",
+   "riot_name": "Akshan",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "mobility",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "utility",
+     "strength": "low"
+    }
+   ],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "mid",
+    "sustain": "low",
+    "burst": "mid",
+    "poke": "low",
+    "vision": "mid"
+   },
+   "difficulty": {
+    "riot": 1,
+    "mine": 2
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "Riot's 1 (Low) comes from the website: the game data has no number",
+   "brief": {
+    "trait_score": 11.0,
+    "comfort": 73.5
+   }
+  },
+  {
+   "name": "Kog'Maw",
+   "riot_name": "KogMaw",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "low",
+    "sustain": "mid",
+    "burst": "low",
+    "poke": "mid",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "500 base; W (about 710) is up often, so no change of group",
+   "brief": {
+    "trait_score": 11.0,
+    "comfort": 71.4
+   }
+  },
+  {
+   "name": "Kai'Sa",
+   "riot_name": "Kaisa",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "mid",
+   "secondary_types": [
+    {
+     "type": "mobility",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "low",
+    "aoe": "low",
+    "sustain": "low",
+    "burst": "mid",
+    "poke": "mid",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 8.5,
+    "comfort": 69.8
+   }
+  },
+  {
+   "name": "Vayne",
+   "riot_name": "Vayne",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "mobility",
+     "strength": "mid"
+    },
+    {
+     "type": "peel",
+     "strength": "low"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "cc": "low",
+    "sustain": "mid",
+    "burst": "low",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Two secondary types: the best one counts (Mobility Mid). Peel Low is noted only",
+   "brief": {
+    "trait_score": 7.5,
+    "comfort": 69.9
+   }
+  },
+  {
+   "name": "Xerath",
+   "riot_name": "Xerath",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "mid",
+    "cc": "mid",
+    "burst": "low",
+    "poke": "high",
+    "vision": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Difficulty High / High (3.0), confirmed",
+   "brief": {
+    "trait_score": 14.0,
+    "comfort": 67.7
+   }
+  },
+  {
+   "name": "Aphelios",
+   "riot_name": "Aphelios",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "hypercarry",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "utility",
+     "strength": "low"
+    }
+   ],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "mid",
+    "cc": "mid",
+    "sustain": "mid",
+    "burst": "mid",
+    "poke": "low",
+    "vision": "mid"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Calibrum range is short-lived: not counted",
+   "brief": {
+    "trait_score": 15.5,
+    "comfort": 66.4
+   }
+  },
+  {
+   "name": "Samira",
+   "riot_name": "Samira",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "lane_bully",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "mobility",
+     "strength": "low"
+    }
+   ],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "low",
+    "aoe": "high",
+    "cc": "low",
+    "sustain": "mid",
+    "burst": "high"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 3
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 12.0,
+    "comfort": 61.4
+   }
+  },
+  {
+   "name": "Draven",
+   "riot_name": "Draven",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "lane_bully",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "mid",
+    "sustain": "mid",
+    "burst": "high",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 12.5,
+    "comfort": 59.7
+   }
+  },
+  {
+   "name": "Nilah",
+   "riot_name": "Nilah",
+   "role": "bot_lane",
+   "kind": "ADC",
+   "main_type": "lane_bully",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "mid",
+    "cc": "low",
+    "sustain": "high",
+    "burst": "high"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "Melee: base range 225",
+   "brief": {
+    "trait_score": 13.0,
+    "comfort": 59.7
+   }
+  },
+  {
+   "name": "Aurelion Sol",
+   "riot_name": "AurelionSol",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "hypercarry",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "high",
+    "team_utility": "mid",
+    "aoe": "high",
+    "cc": "low",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "CC Low is the owner's call (the R knockup only matters late); no Burst (owner's call)",
+   "brief": {
+    "trait_score": 14.0,
+    "comfort": 61.7
+   }
+  },
+  {
+   "name": "Karthus",
+   "riot_name": "Karthus",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "mid",
+    "aoe": "high",
+    "cc": "low",
+    "burst": "mid",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 3
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "",
+   "brief": {
+    "trait_score": 14.5,
+    "comfort": 61.0
+   }
+  },
+  {
+   "name": "Swain",
+   "riot_name": "Swain",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "low",
+    "team_utility": "low",
+    "aoe": "high",
+    "cc": "mid",
+    "sustain": "high",
+    "burst": "low",
+    "poke": "mid",
+    "vision": "mid"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 2
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Vision Mid: W reveals from 5,500+ range",
+   "brief": {
+    "trait_score": 16.5,
+    "comfort": 71.9
+   }
+  },
+  {
+   "name": "Veigar",
+   "riot_name": "Veigar",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "hypercarry",
+     "strength": "mid"
+    }
+   ],
+   "mastery": "below_average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "low",
+    "cc": "mid",
+    "burst": "high",
+    "poke": "mid"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Very easy to play in the owner's view, even though Riot rates him High",
+   "brief": {
+    "trait_score": 13.0,
+    "comfort": 71.3
+   }
+  },
+  {
+   "name": "Vladimir",
+   "riot_name": "Vladimir",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "peel",
+     "strength": "high"
+    }
+   ],
+   "mastery": "never_played",
+   "traits": {
+    "wave_clear": "low",
+    "aoe": "mid",
+    "sustain": "high",
+    "burst": "high",
+    "poke": "low"
+   },
+   "difficulty": {
+    "riot": 3,
+    "mine": 2
+   },
+   "range": "short",
+   "flexible_build": false,
+   "note": "Ranged (450, LoL Wiki). Peel High: W pool makes him untargetable; Hypercarry Mid also noted. No CC (owner's call: his slows aren't worth counting). Very weak early, survives through self-peel and scales well",
+   "brief": {
+    "trait_score": 11.5,
+    "comfort": 62.3
+   }
+  },
+  {
+   "name": "Seraphine",
+   "riot_name": "Seraphine",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "utility",
+     "strength": "high"
+    }
+   ],
+   "mastery": "good",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "high",
+    "aoe": "high",
+    "cc": "high",
+    "sustain": "high",
+    "burst": "low",
+    "poke": "mid"
+   },
+   "difficulty": {
+    "riot": 1,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Riot difficulty Low from the website (no number in game data)",
+   "brief": {
+    "trait_score": 21.0,
+    "comfort": 89.0
+   }
+  },
+  {
+   "name": "Mel",
+   "riot_name": "Mel",
+   "role": "bot_lane",
+   "kind": "APC",
+   "main_type": "mage",
+   "main_strength": "high",
+   "secondary_types": [
+    {
+     "type": "peel",
+     "strength": "low"
+    }
+   ],
+   "mastery": "average",
+   "traits": {
+    "wave_clear": "mid",
+    "team_utility": "low",
+    "aoe": "mid",
+    "cc": "mid",
+    "burst": "mid",
+    "poke": "high"
+   },
+   "difficulty": {
+    "riot": 2,
+    "mine": 1
+   },
+   "range": "medium",
+   "flexible_build": false,
+   "note": "Peel Low: W shield and reflect; Lane bully also noted",
+   "brief": {
+    "trait_score": 14.5,
+    "comfort": 79.2
+   }
+  }
+ ]
+}

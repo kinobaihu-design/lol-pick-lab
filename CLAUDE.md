@@ -1,6 +1,6 @@
 # LoL Pick Lab — instructions for Claude
 
-`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.41**. If the two disagree, the brief wins; ask the owner which to update.
+`project-brief.pdf` (kept locally, not in the repo) is the source of truth. This file summarizes it; current brief: **v0.43**. If the two disagree, the brief wins; ask the owner which to update.
 
 ## Rules for working with the owner
 
@@ -321,6 +321,21 @@ Pasted from the owner; the live brief has the full details.
 - New board item (moved to Phase 2, right after "Publish on Vercel"): **Admin page**, with a "Mastery review done" button first, then card editing. It replaces the open question about editing cards.
 - No change to the Pick Score.
 
+## Brief changes v0.43 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Admin page slice 2 approved: card editing** (mastery + traits) with a Comfort preview and a quick rescore after each edit. Phase 4 board item added: "Admin page: add new cards" (not built).
+- **The card files in the repo are now the source of truth for card values** (`scoring/cards.json`, copied to `site/data/cards.json`). The brief's card tables are a v0.43 snapshot. No change to the Pick Score formula.
+- **What was built (Oct 11):**
+  - `/admin` shows every card (sorted by name) under the review button: a Mastery dropdown and one dropdown per trait (None / Low / Mid / High), starting at the card's current values, a live preview line ("Comfort 86.3 → 89.1", plus "trait average 13.95 → 13.82, all cards move slightly" when a trait changes) and an Update button. One password box at the top, emptied after every action. Type, strength, difficulty, range and notes are not editable. The preview maths is `site/comfort-preview.js`, a copy of `scoring/comfort.py` and its constants; tests compare it with the Python code for every card and every possible single change (including trait-average changes, caps and Varus's flexibility bonus). **When `scoring/comfort.py` or `scoring/config.py` changes, update the copy; the tests fail otherwise.**
+  - Helper `api/admin-card.js` (logic `lib/admin-cards.js`, shared parts `lib/admin-common.js`): `GET` returns the newest cards; `POST` changes ONE value. Same password check and wrong-password wait as slice 1. It accepts only `{password, champion, field, from, value}` with field = `mastery` or one of the 8 traits and only the allowed values (anything else, unknown champions included, is refused before GitHub is touched). It re-reads the newest `scoring/cards.json` from GitHub right before saving; if the card no longer has the `from` value it answers "Someone else changed the cards, reload and try again"; if `main` moved meanwhile it re-reads and retries (up to 3 times). It edits the file text in place (nothing else in the file changes) and checks that the result is the old data plus exactly that one change. One commit per edit, e.g. "Card edit: Jinx mastery Good → Main" or "Card edit: Jinx AoE High → Mid"; those commits are the edit history. It writes only the two card files and **never touches `review.json`**. Same Vercel secrets (`ADMIN_PASSWORD`, `GITHUB_TOKEN`); no new token permission. The page sends one request per changed field.
+  - **Quick rescore:** `.github/workflows/rescore.yml` runs when `scoring/cards.json` or `site/data/cards.json` changes on `main`. It reapplies the scoring to the data already on the `data` branch (zero Riot requests; no Riot key or player-code secret in the workflow) and replaces only the scores. Rule chosen: **if a collector run is going or waiting, the rescore stops at once** (it does not queue behind it, and it never shares the collector's concurrency group, because a queued rescore would cancel a waiting collector). That is safe because **the collector now reads the newest cards from `main` every time it scores** (`newest_cards` in `collector/main.py`, at least once an hour; falls back to its checkout's cards if GitHub can't be reached). Otherwise the rescore pushes with `--force-with-lease` against the `data` commit it loaded, so it can never overwrite a collector save. Quick edits in a row replace each other (newest cards win). A rescore keeps the scores file's "generated" time (`--keep-generated`), so "Last updated" still means when games were last collected. If a rescore fails, the old scores stay on the site and the next collector run fixes it.
+  - New options: `python -m scoring --cards-file FILE` and `--keep-generated`.
+  - **Timing:** the cards on the page (and the admin page) update when Vercel rebuilds from `main` (about a minute); the scores update about 2 to 3 minutes after the edit (rescore), then up to 5 minutes of GitHub caching; with a collector run in progress, at the collector's next save (within an hour).
+- **Tests and the card files:** tests that compare with the saved scores copy or the brief numbers read a frozen copy of the cards, `tests/fixtures/cards_snapshot.json` (the cards as of Oct 11), so editing a card from the admin page never breaks the tests (and the collector workflow, which runs them, keeps working). `python -m scoring --self-check` compares the *current* cards with the brief snapshot numbers, so it will report differences after any card edit; that is expected.
+- Comfort tab hover text reworded: it now mentions the review button on the admin page (the address stays hidden).
+
 ## Tier list page (`site/`, Phase 2, slices 1, 2 and 3 built Oct 11, 2026)
 
 - Plain static files (HTML, CSS, JavaScript; no server, no build step). `index.html` + `style.css` + `app.js` draw the table; `format.js` holds the small text helpers; `settings.js` holds every setting (data address, sample-size limits, "stale after" hours).
@@ -376,7 +391,7 @@ Pasted from the owner; the live brief has the full details.
 - [x] Publish on Vercel and share the link with one friend (project `baihu-lol-pl`, site baihu-lol-pl.vercel.app; published and checked by the owner Oct 11: fresh data, no saved-copy notice, 4 tabs OK; Riot portal Product URL updated; shared with the owner's brother)
 - [ ] Admin page (plan approved Oct 11): hidden address `/admin` only, no link on the site, password typed for every action.
   - [x] Slice 1 (built Oct 11): password box + "Mastery review done" button. Page `site/admin.html` + `site/admin.js` (noindex meta and `X-Robots-Tag`); Vercel helper `api/admin-review.js` with its logic in `lib/admin-review.js`. The helper reads the Vercel secrets `ADMIN_PASSWORD` and `GITHUB_TOKEN`, compares the password in constant time (wrong password: waits 3 s, "Wrong password"), reads the CURRENT patch itself from `scores/latest.json` on the data branch (never from the browser; must look like "16.20"), and writes it to `scoring/review.json` and `site/data/review.json` in ONE commit on `main` ("Mastery review done on patch X (admin page)"). It can change only those two files. Errors: "Admin not set up yet", "GitHub key expired or invalid: make a new one", "Couldn't read the current patch, try later". Tests: `tests/admin_review.test.js` (fake GitHub) and `tests/test_vercel.py`. The owner still has to set the two secrets on Vercel (never in chat or files).
-  - [ ] Slice 2 (later): card editing with "Update" buttons. **Card updates NEVER reset the review reminder; only "Mastery review done" does.**
+  - [ ] Slice 2 (approved v0.43; built Oct 11, see "Brief changes v0.43"): card editing (mastery + the 8 traits) on `/admin`, with a live Comfort preview, one commit per edit and a quick rescore. **Card updates NEVER reset the review reminder; only "Mastery review done" does.**
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
 **Phase 3, draft helper**
@@ -386,6 +401,7 @@ Pasted from the owner; the live brief has the full details.
 **Phase 4, later**
 - [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
 - [ ] Ban suggestions (moved here from Phase 2 in v0.37)
+- [ ] Admin page: add new cards (later)
 - [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
 - [x] Make cards for new bot-lane champions that pass the filters (Aurelion Sol, Karthus, Swain, Veigar, Vladimir, Seraphine, Mel; done Oct 11; more if the "Needs a card" list grows)
 - [ ] Apply for a production key if the site grows beyond friends
@@ -429,6 +445,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.43** (Oct 11, 2026): no score change. Admin page card editing (mastery + traits) with Comfort preview, one commit per edit, quick rescore workflow; the card files become the source of truth.
 - **v0.42** (Oct 11, 2026): no score change. "Last mastery review: patch X" reminder on the Comfort tab (one setting in `scoring/review.json`); Admin page added to the board (later).
 - **v0.41** (Oct 11, 2026): no score change. Player codes get a secret key (`PLAYER_CODE_SALT`); old codes converted without losing data; `data` and `data-backup` history reset; Riot policy dates logged (general May 29, 2025; League game policy Aug 21, 2026).
 - **v0.40** (Oct 11, 2026): no score change. Growth tab gets the third table "Utopy picks" (long-term goals, information only). Riot developer rules plan: legal notice and about line footer on all tabs, key-scan and legal-notice tests, safety audit.

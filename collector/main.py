@@ -7,6 +7,7 @@ Threads:
 
 import argparse
 import heapq
+import json
 import os
 import subprocess
 import sys
@@ -320,10 +321,12 @@ class Run:
         """Recalculate the scores from the data just saved (writes `scores/` next to it).
         Runs as its own process and may fail without stopping the collector or the upload."""
         repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        command = [sys.executable, "-m", "scoring", "--data-dir", os.path.abspath(self.args.data_dir)]
+        cards = newest_cards(repo)
+        if cards:
+            command += ["--cards-file", cards]
         try:
-            result = subprocess.run(
-                [sys.executable, "-m", "scoring", "--data-dir", os.path.abspath(self.args.data_dir)],
-                cwd=repo, capture_output=True, text=True, timeout=SCORING_TIMEOUT_SECONDS)
+            result = subprocess.run(command, cwd=repo, capture_output=True, text=True, timeout=SCORING_TIMEOUT_SECONDS)
             if result.returncode == 0:
                 log(result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "Scores updated")
             else:
@@ -356,6 +359,24 @@ class Run:
             log("Upload to GitHub failed: %s" % (error.stderr or "").strip()[:300])
             if final:
                 raise
+
+
+def newest_cards(repo):
+    """The champion cards as they are on `main` right now, saved to a temporary file (None if that fails).
+    A card edited from the admin page while this run is going is then in the very next scoring, not only in the
+    next run. If GitHub can't be reached the cards from this run's checkout are used."""
+    try:
+        def run(arguments):
+            return subprocess.run(["git"] + arguments, cwd=repo, check=True, capture_output=True, text=True, timeout=60).stdout
+        run(["fetch", "--no-tags", "--depth=1", "origin", "main"])
+        text = run(["show", "FETCH_HEAD:scoring/cards.json"])
+        json.loads(text)
+        path = os.path.join(tempfile.gettempdir(), "lol-pick-lab-newest-cards.json")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        return path
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
 
 
 def git(arguments, env, cwd):
