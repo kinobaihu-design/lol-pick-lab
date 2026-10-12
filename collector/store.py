@@ -22,6 +22,9 @@ DETAIL_FILES = {"BOTTOM": "bottom.json.gz", "UTILITY": "utility.json.gz", "JUNGL
 PATCH_PATTERN = re.compile(r"^\d+\.\d+$")
 
 
+MIN_PATCHES = 2  # cleanup never keeps fewer: the current and the previous patch
+
+
 class DataDamaged(Exception):
     """A saved file could not be read."""
 
@@ -273,7 +276,10 @@ class Store:
         """Build season totals from the patch files when a season has none yet,
         so nothing collected before season totals existed is lost."""
         by_season = {}
+        newest = max((season_of(n) for n in self.patches), key=int, default=None)
         for name in self.patches:
+            if season_of(name) != newest:
+                continue  # older seasons are not kept, so they are not rebuilt
             by_season.setdefault(season_of(name), []).append(name)
         for season_name, names in by_season.items():
             if season_name in self.seasons:
@@ -316,7 +322,7 @@ class Store:
 
     def save(self, root, run_info):
         """Write everything to `root`, then read it back to make sure it isn't damaged."""
-        keep = sorted(self.patches, key=patch_order)[-config.KEEP_PATCHES:]
+        keep = sorted(self.patches, key=patch_order)[-max(config.KEEP_PATCHES, MIN_PATCHES):]
         for name in list(self.patches):
             if name not in keep:
                 del self.patches[name]
@@ -330,15 +336,27 @@ class Store:
         for name in os.listdir(patches_dir):
             if name not in self.patches:
                 shutil.rmtree(os.path.join(patches_dir, name))
+        ordered = sorted(self.patches, key=patch_order)
+        with_players = ordered[-max(config.KEEP_PLAYER_PATCHES, MIN_PATCHES):]
         for name, patch in self.patches.items():
             folder = os.path.join(patches_dir, name)
-            _write(os.path.join(folder, "summary.json"), self.summary(name))
+            summary = self.summary(name)
+            _write(os.path.join(folder, "summary.json"), summary)
             _write(os.path.join(folder, "champions.json"), patch["champions"])
+            # The small archive is written for every patch and never cleaned up.
+            _write(os.path.join(root, config.ARCHIVE_DIR, name, "summary.json"), summary)
+            _write(os.path.join(root, config.ARCHIVE_DIR, name, "champions.json"), patch["champions"])
             for role, filename in DETAIL_FILES.items():
                 _write(os.path.join(folder, filename), patch["detail"][role])
-            _write(os.path.join(folder, "players.json.gz"), patch["players"])
+            players_path = os.path.join(folder, "players.json.gz")
+            if name in with_players:
+                _write(players_path, patch["players"])
+            else:
+                patch["players"] = {}
+                if os.path.exists(players_path):
+                    os.remove(players_path)
 
-        keep_seasons = sorted(self.seasons, key=int)[-config.KEEP_SEASONS:]
+        keep_seasons = sorted(self.seasons, key=int)[-max(config.KEEP_SEASONS, 1):]
         for name in list(self.seasons):
             if name not in keep_seasons:
                 del self.seasons[name]
@@ -392,7 +410,9 @@ class Store:
                     path = os.path.join(folder, filename)
                     # Patches saved before a role was added simply start empty for it.
                     patch["detail"][role] = _read(path) if os.path.exists(path) else {}
-                patch["players"] = _read(os.path.join(folder, "players.json.gz"))
+                players_path = os.path.join(folder, "players.json.gz")
+                # Older patches no longer keep their player file.
+                patch["players"] = _read(players_path) if os.path.exists(players_path) else {}
                 store.patches[name] = patch
             seasons_dir = os.path.join(root, "season")
             for name in os.listdir(seasons_dir) if os.path.isdir(seasons_dir) else []:
@@ -413,6 +433,43 @@ def check_codes(root):
         raise CodesMismatch("%s is missing: the data has not been converted to secret-key codes" % CODES_FILE)
     if saved.get("version") != CODES_VERSION or saved.get("check") != secret_check():
         raise CodesMismatch("the data was made with a different player-code secret")
+
+
+def prune_scores(root):
+    """Keep the newest KEEP_SCORE_FILES `scores/<patch>.json` files. `latest.json` and the
+    newest patch's file are never removed."""
+    folder = os.path.join(root, "scores")
+    if not os.path.isdir(folder):
+        return []
+    names = [n[:-5] for n in os.listdir(folder) if n.endswith(".json") and PATCH_PATTERN.match(n[:-5])]
+    names.sort(key=patch_order)
+    old = names[:-max(config.KEEP_SCORE_FILES, MIN_PATCHES)]
+    for name in old:
+        os.remove(os.path.join(folder, name + ".json"))
+    return old
+
+
+def biggest_file(root):
+    """(size in bytes, path relative to root) of the biggest file saved, or (0, None)."""
+    best = (0, None)
+    for folder, _, files in os.walk(root):
+        for name in files:
+            path = os.path.join(folder, name)
+            size = os.path.getsize(path)
+            if size > best[0]:
+                best = (size, os.path.relpath(path, root))
+    return best
+
+
+def size_report(root):
+    """Lines for the run summary: the biggest file, with a clear warning at SIZE_WARNING_MB."""
+    size, path = biggest_file(root)
+    mb = size / 1_000_000
+    line = "Biggest saved file: %s, %.1f MB (warning at %d MB)." % (path or "none", mb, config.SIZE_WARNING_MB)
+    if mb >= config.SIZE_WARNING_MB:
+        line = "WARNING: biggest saved file is %s, %.1f MB, at or over the %d MB warning line. Tell Alejandro." % (
+            path, mb, config.SIZE_WARNING_MB)
+    return line, mb >= config.SIZE_WARNING_MB
 
 
 def season_of(patch):
@@ -483,6 +540,8 @@ replaced on every save, so it has no history. `data-backup` holds the previous
 run's copy.
 
 ## patches/<patch>/
+The last 5 patches are kept. `players.json.gz` is kept only for the newest few
+(see `KEEP_PLAYER_PATCHES` in `collector/config.py`).
 - `summary.json`: games counted, games per server, Diamond+ average win rate
   (weighted and unweighted), and average win rate per role.
 - `champions.json`: per champion ID: name, games and wins per role, and bans.
@@ -495,16 +554,20 @@ run's copy.
   (jungle, from Oct 3, 2026) for games in those roles. Used for the "recent games" part of the OTP rule (current +
   previous patch). Real player IDs are never stored.
 
+## archive/<patch>/
+`summary.json` and `champions.json` of every patch, kept forever (tiny). They
+survive the cleanup of the `patches/` folders.
+
 ## season/<season>/players.json.gz
 Running totals for the whole season (season 16 = patches 16.x), never pruned
-during the season, for the "50 games this season" part of the OTP rule:
+during the season; only the current season is kept, for the "50 games this season" part of the OTP rule:
 - `players`: per scrambled player code, `"all"` = `[games, wins]` across every
   champion, plus `[games, wins]` per champion ID and per `"ID:B"` / `"ID:S"` /
   `"ID:J"`, only for bot-lane, support and jungle champions.
 - `champions`: the champion IDs counted this season (at least 200 games in a
   patch with at least 10% in bot lane, support or jungle; once in, they stay).
   When a champion joins, its earlier games are copied in from the patch files
-  still kept (the last 3 patches).
+  still kept (the patches that keep a `players.json.gz`).
 Games collected before season totals existed were copied in from the patch
 files (without the bot/support split, which starts from that point).
 
@@ -524,8 +587,8 @@ Weighted games = 2 * games x2 + games x1.
 
 ## scores/
 Written right after each save by the scoring code (`scoring/` on the `main` branch,
-model v0.34): `latest.json` and `<patch>.json` with the Pick Score list, Meta Score
-list, Ban threat list, Growth advisor suggestions, and champions without a card.
+model v0.44): `latest.json` and `<patch>.json` (the last 20 patches) with the Pick Score
+list, Meta Score list, Growth advisor suggestions, and champions without a card.
 
 ## state/
 The collector's memory: when each player was last checked, which games were

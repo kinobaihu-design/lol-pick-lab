@@ -11,7 +11,7 @@ A free, non-commercial website for me and a few friends. Every patch it ranks Le
 
 - The tier list works, with four tabs: Tier list · Meta · Comfort · Growth.
 - It isn't public yet. It will be hosted on Vercel later.
-- The draft helper, the support tier list and the jungle tier list come later.
+- The support tier list and the jungle tier list come later.
 
 **Privacy**
 

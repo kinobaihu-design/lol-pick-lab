@@ -48,7 +48,7 @@ ROLE_TAGS = {"BOTTOM": "B", "UTILITY": "S", "JUNGLE": "J"}
 # season, and its earlier games are copied in from the patch files still kept.
 SEASON_CHAMPION_MIN_GAMES = 200
 SEASON_CHAMPION_MIN_SHARE = 0.10
-KEEP_SEASONS = 2
+KEEP_SEASONS = 1                # seasons of player totals kept (the current one only)
 
 # Personal key limits per routing value: (requests, seconds). Riot's response
 # headers replace these if they differ. We stay a little under them.
@@ -64,7 +64,14 @@ MAX_LOOKBACK_DAYS = 10            # never ask for games older than this
 OVERLAP_HOURS = 2                 # re-check a little before the last check (games in progress)
 
 # What is kept.
-KEEP_PATCHES = 3              # patches of totals kept (current + at least 2 earlier)
+# Data storage standard (brief v0.44). Cleanup never goes below the floors in
+# `store.py` (current + previous patch, current season, latest scores).
+KEEP_PATCHES = 5              # per-patch folders kept: champion stats, items, runes, matchups
+KEEP_PLAYER_PATCHES = 3       # patches that keep players.json.gz (owner's decision: the season rebuild and
+                              # new-champion back-fill read these files)
+KEEP_SCORE_FILES = 20         # scores/<patch>.json files kept (latest.json always stays)
+ARCHIVE_DIR = "archive"       # tiny summary.json + champions.json per patch, kept forever
+SIZE_WARNING_MB = 40          # the run summary warns when the biggest saved file is this big
 PROCESSED_KEEP_DAYS = 14      # must stay above MAX_LOOKBACK_DAYS
 MAX_PENDING_PER_SERVER = 50000
 MIN_GAME_SECONDS = 300        # shorter games are remakes and are skipped

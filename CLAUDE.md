@@ -27,7 +27,7 @@ One review round per step, so we keep improving without getting stuck:
 A free public website that ranks ADC and support champions each patch using the owner's own rules. Priorities, in order:
 
 1. **Personal tier list** for ADC (support later), from Diamond+ data and the owner's scoring.
-2. **Draft helper**: enter the draft, get the top 3 picks with reasons.
+2. ~~Draft helper~~ removed for good in v0.44 (the site is a personal tier list only).
 
 Build recommendations (items, runes, skill order) were dropped from the goals on Oct 11, 2026; they may come back later as an extra (Phase 4). The collector keeps saving items and runes meanwhile.
 
@@ -53,12 +53,12 @@ The final site covers 3 roles: bot lane (ADC and APC), support and jungle, built
 - Code: `collector/` (Python standard library only). Settings, including `PRIORITY_SHARE`, double-weight servers, recheck timing and patches kept, are in `collector/config.py`.
 - Schedule: `.github/workflows/collect.yml` runs every 6 hours, about 5 hours of work per run, and never two runs at once. "Run workflow" on the Actions page takes a time limit and a per-region game limit for tests. It saves a checkpoint every hour.
 - What it does: it loads each server's Diamond+ list and checks players for new queue 420 games. Active players are rechecked after 5 hours; inactive ones after 24 hours, then doubling up to 14 days (lookback stays 10 days). Each new game is downloaded once, and only Diamond+ participants are counted. Within each routing region, the priority servers get `PRIORITY_SHARE` (70%) of requests: Americas LAN and NA, Europe EUW, Asia KR. SEA is split evenly.
-- Data lives on the `data` branch, replaced each save with no history (fetch it with `git fetch origin +data:refs/remotes/origin/data`). `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Totals for the last 3 patches are kept. See the `README.md` on the data branch for the file format. Player IDs are stored only as secret-key codes (v0.41).
+- Data lives on the `data` branch, replaced each save with no history (fetch it with `git fetch origin +data:refs/remotes/origin/data`). `data-backup` holds the previous run's copy, and the collector falls back to it if a file is damaged. Storage standard v0.44: see "Brief changes v0.44". See the `README.md` on the data branch for the file format. Player IDs are stored only as secret-key codes (v0.41).
 - **Roles with full detail:** bot lane (`BOTTOM`), support (`UTILITY`) and jungle (`JUNGLE`, from Oct 3, 2026), set in `config.DETAIL_ROLES`. Each has a per-patch file (`bottom`, `utility`, `jungle`.json.gz) with games, final items, rune pages, and allies/enemies per champion. Jungle costs no extra Riot requests, since every downloaded game already has all 10 players. Nothing is built on jungle data until the bot-lane tier list is done, and the role order is bot lane, then support, then jungle.
 - Champions are stored by Riot's champion ID. The `name` field is Riot's internal name (`Kaisa`, `MissFortune`, `KogMaw`); the website must take display names from Data Dragon.
 - **Player files (for the OTP rule).** Players appear only as scrambled codes. Counters are `[games, wins]`; a key `"ID"` means all roles, `"ID:B"` bot-lane games, `"ID:S"` support games and `"ID:J"` jungle games (from Oct 3, 2026).
   - `patches/<patch>/players.json.gz` holds every champion each player played that patch. It answers "55% of recent games", where recent = current + previous patch.
-  - `season/<season>/players.json.gz` holds running totals for the season (season 16 = patches 16.x), never pruned during the season. It answers "at least 50 games on it this season". `"all"` is the player's total ranked games, any champion. Per-champion counts (with the B/S/J split) are kept only for the site's 3 roles: bot-lane, support and jungle champions, meaning at least 200 games in a patch with ≥10% in one of those roles (`SEASON_CHAMPION_MIN_GAMES`, `SEASON_CHAMPION_MIN_SHARE`). Once a champion qualifies it stays for the season, and its earlier games are copied in from the patch files still kept (last 3 patches). The `champions` list is stored in the file.
+  - `season/<season>/players.json.gz` holds running totals for the season (season 16 = patches 16.x), never pruned during the season. It answers "at least 50 games on it this season". `"all"` is the player's total ranked games, any champion. Per-champion counts (with the B/S/J split) are kept only for the site's 3 roles: bot-lane, support and jungle champions, meaning at least 200 games in a patch with ≥10% in one of those roles (`SEASON_CHAMPION_MIN_GAMES`, `SEASON_CHAMPION_MIN_SHARE`). Once a champion qualifies it stays for the season, and its earlier games are copied in from the patch files that still have a players file. The `champions` list is stored in the file.
   - A new season starts when the first part of the patch number changes. The current and the previous season are kept (`KEEP_SEASONS = 2`).
   - When a season file is missing, it's rebuilt from the patch files, so nothing is lost. Games from before Oct 2, 2026 (the start of season totals) have no B/S split.
   - Only games we collect are counted, starting Oct 2, 2026, so season totals undercount early on. The OTP reliability formula keeps small OTP samples near neutral.
@@ -90,7 +90,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
-- **Ban suggestions (moved to later in v0.37; the old code was removed in v0.38; do not build any ban list now)** (any role, separate from picks), by data only (needs the same 1,000 real games and the same pick-rate bar, 0.8%, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat. Any role, and each champion's main role is shown.
+- **Ban suggestions (removed for good in v0.44; the old code was removed in v0.38; do not build any ban list)** (any role, separate from picks), by data only (needs the same 1,000 real games and the same pick-rate bar, 0.8%, my reading, so thin samples can't top the list): `Ban threat = (win rate − Diamond+ average) × pick rate`, meaning how strong a champion is times how often the owner will face it. Only champions above the average win rate count, ranked by Ban threat. Any role, and each champion's main role is shown.
 - **Champions without a card** get no Pick Score, because Comfort needs a card. They still appear in the Meta Score (the data-only ranking) with a "no card yet" label, and in the **Needs a card** list: champions that pass the filters but have no card, sorted by Meta Score. They are not in the Growth advisor (v0.35).
 
 ### Comfort in detail
@@ -217,6 +217,25 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Aphelios:** hard to learn but rewarding; strong vs divers. OTPs likely beat his average.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
+
+## Brief changes v0.44 (no change to the Pick Score), Oct 11, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Draft helper, build recommendations and ban suggestions removed for good.** The site is the personal tier list only. Items, runes and matchup data keep being saved.
+- Admin page done (slices 1–2, 139 tests).
+- **New Phase 3 "Road to 1.0":** (a) Admin page: add new cards, (b) smooth run = one full patch with no collector failures and no red "scores are old" warnings, and every admin action working live once. Then the site is v1.0. Phase 4 = "After 1.0": weight tuning (1.x), support tier list (v2.0), jungle (v3.0), production key.
+- **Version numbering:** v0.x = setup until Phase 3 is done; a new role = a new main number; rule/feature changes inside a role = 1.1, 1.2…; no version for admin card edits, adding a card with existing rules, bug fixes or wording.
+- **Data storage standard (all settings in `collector/config.py`):**
+  - Raw matches never stored. Match IDs 14 days.
+  - Per-patch folders (champion stats, items, runes, matchups): last **5** patches (`KEEP_PATCHES`).
+  - `archive/<patch>/summary.json` + `champions.json`: every patch, **forever** (about 31 KB a patch), written on every save and never cleaned (`ARCHIVE_DIR`).
+  - `scores/<patch>.json`: last **20** (`KEEP_SCORE_FILES`; `latest.json` always stays). Cleanup is `prune_scores` in `collector/store.py`, run after each scoring.
+  - Per-patch `players.json.gz`: **last 3 patches** (`KEEP_PLAYER_PATCHES = 3`). Decided by the owner within v0.44 (the brief's storage table says 3 too): safety for the season rebuild (`_seed_seasons`) and the new-champion back-fill (`_copy_from_patches`) matters more than about 8 MB. Older patch folders load fine without the file.
+  - Season file: current season only (`KEEP_SEASONS = 1`); older seasons are no longer rebuilt from patch files.
+  - Cleanup floors (`MIN_PATCHES = 2` in `store.py`): never fewer than the current + previous patch, the current season, `latest.json`.
+  - **Size watch:** the run summary and log show the biggest saved file; a clear WARNING at `SIZE_WARNING_MB` = 40. No emails.
+- Tests: `StorageStandardTests` in `tests/test_collector.py`.
 
 ## Brief changes v0.35 (no model change), Oct 11, 2026
 
@@ -394,15 +413,13 @@ Pasted from the owner; the live brief has the full details.
   - [ ] Slice 2 (approved v0.43; built Oct 11, see "Brief changes v0.43"): card editing (mastery + the 8 traits) on `/admin`, with a live Comfort preview, one commit per edit and a quick rescore. **Card updates NEVER reset the review reminder; only "Mastery review done" does.**
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
-**Phase 3, draft helper**
-- [ ] Add matchup and synergy data from the collected matches (maybe: per-champion counter bans)
-- [ ] Draft screen: enter allies and enemies, get the top 3 picks with reasons, using champion traits (CC vs divers, sustain vs poke). **Always offer several choices with reasons, never one forced pick** (Riot rule: apps can't dictate player decisions)
+**Phase 3, Road to 1.0**
+- [ ] Admin page: add new cards
+- [ ] Smooth run: one full patch with no collector failures and no red "scores are old" warnings, and every admin action working live once. Then the site is v1.0.
 
-**Phase 4, later**
-- [ ] Maybe: build recommendations (core items, boots, runes, skill order), only after deciding the build rules (win rate vs pick rate, minimum games per build)
-- [ ] Ban suggestions (moved here from Phase 2 in v0.37)
-- [ ] Admin page: add new cards (later)
-- [ ] Support tier list, then jungle tier list (the 3 roles of the final site)
+**Phase 4, after 1.0**
+- [ ] Weight tuning (1.x)
+- [ ] Support tier list (v2.0), then jungle tier list (v3.0)
 - [x] Make cards for new bot-lane champions that pass the filters (Aurelion Sol, Karthus, Swain, Veigar, Vladimir, Seraphine, Mel; done Oct 11; more if the "Needs a card" list grows)
 - [ ] Apply for a production key if the site grows beyond friends
 
@@ -445,6 +462,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.44** (Oct 11, 2026): no score change. Draft helper, builds and ban suggestions removed for good; Road to 1.0; version numbering rule; data storage standard.
 - **v0.43** (Oct 11, 2026): no score change. Admin page card editing (mastery + traits) with Comfort preview, one commit per edit, quick rescore workflow; the card files become the source of truth.
 - **v0.42** (Oct 11, 2026): no score change. "Last mastery review: patch X" reminder on the Comfort tab (one setting in `scoring/review.json`); Admin page added to the board (later).
 - **v0.41** (Oct 11, 2026): no score change. Player codes get a secret key (`PLAYER_CODE_SALT`); old codes converted without losing data; `data` and `data-backup` history reset; Riot policy dates logged (general May 29, 2025; League game policy Aug 21, 2026).

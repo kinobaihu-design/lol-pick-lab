@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from . import config
 from .riot import KeyRejected, NotFound, RequestFailed, RiotClient
-from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret,
+from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret, prune_scores, size_report,
                     scramble, win_rate)
 
 APEX_TIERS = ("challengerleagues", "grandmasterleagues", "masterleagues")
@@ -333,6 +333,12 @@ class Run:
                 log("Scoring failed (data is still saved): %s" % (result.stderr or "").strip()[-300:])
         except (OSError, subprocess.SubprocessError) as error:
             log("Scoring failed (data is still saved): %s" % error)
+        try:
+            removed = prune_scores(self.args.data_dir)
+            if removed:
+                log("Removed old score files: %s" % ", ".join(removed))
+        except OSError as error:
+            log("Could not clean old score files: %s" % error)
 
     def push(self, final):
         """Replace the `data` branch with one fresh commit. The first save of a run
@@ -396,7 +402,7 @@ def progress(run):
     log("Progress: " + "; ".join(parts))
 
 
-def write_step_summary(info):
+def write_step_summary(info, data_dir=None):
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not path:
         return
@@ -415,6 +421,8 @@ def write_step_summary(info):
     for name, c in info["requests_by_routing"].items():
         lines.append("| %s | %d | %d | %d |" % (name, c.get("requests", 0), c.get("rate_limited", 0),
                                                c.get("errors", 0)))
+    if data_dir:
+        lines += ["", size_report(data_dir)[0]]
     with open(path, "a") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -482,7 +490,8 @@ def main():
 
     progress(run)
     info = run.save(final=True)
-    write_step_summary(info)
+    write_step_summary(info, args.data_dir)
+    log(size_report(args.data_dir)[0])
     total = sum(s["games_counted"] for s in info["servers"].values())
     log("Done: %d new games counted." % total)
     if run.key_problem:

@@ -14,7 +14,8 @@ os.environ.setdefault("PLAYER_CODE_SALT", "test-only-secret-" + "0123456789abcde
 
 from collector import config  # noqa: E402
 from collector.riot import Limiter, parse_limits  # noqa: E402
-from collector.store import DataDamaged, Store, compact_match, scramble  # noqa: E402
+from collector.store import (DataDamaged, Store, biggest_file, compact_match, prune_scores, scramble,  # noqa: E402
+                             size_report)
 
 POSITIONS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
 
@@ -102,11 +103,13 @@ class StoreTests(unittest.TestCase):
     def test_keeps_only_recent_patches(self):
         store = Store()
         everyone = {scramble("player-%d" % i) for i in range(10)}
-        for minor in (16, 17, 18, 19, 9):
+        for minor in (14, 15, 16, 17, 18, 19, 20, 9):
             store.add_match(compact_match(fake_match(version="16.%d.1" % minor), "NA1_%d" % minor, "NA1"), everyone)
         with tempfile.TemporaryDirectory() as root:
             store.save(root, {})
-            self.assertEqual(sorted(os.listdir(os.path.join(root, "patches"))), ["16.17", "16.18", "16.19"])
+            self.assertEqual(config.KEEP_PATCHES, 5)
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "patches"))),
+                             ["16.16", "16.17", "16.18", "16.19", "16.20"])
 
 
 class SeasonTests(unittest.TestCase):
@@ -165,14 +168,129 @@ class SeasonTests(unittest.TestCase):
             again = Store.load(root)
             self.assertEqual(again.seasons["16"]["players"][scramble("player-3")]["all"], [games, games])
 
-    def test_keeps_two_seasons(self):
+    def test_keeps_only_the_current_season(self):
         store = Store()
         everyone = {scramble("player-%d" % i) for i in range(10)}
         for major in (14, 15, 16):
             store.add_match(compact_match(fake_match(version="%d.1.1" % major), "NA1_%d" % major, "NA1"), everyone)
         with tempfile.TemporaryDirectory() as root:
             store.save(root, {})
-            self.assertEqual(sorted(os.listdir(os.path.join(root, "season"))), ["15", "16"])
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "season"))), ["16"])
+            self.assertEqual(config.KEEP_SEASONS, 1)
+
+    def test_old_season_is_not_rebuilt_from_patch_files(self):
+        store = Store()
+        everyone = {scramble("player-%d" % i) for i in range(10)}
+        for version in ("16.5.1", "17.1.1"):
+            store.add_match(compact_match(fake_match(version=version), "NA1_" + version, "NA1"), everyone)
+        with tempfile.TemporaryDirectory() as root:
+            store.save(root, {})
+            shutil.rmtree(os.path.join(root, "season"))
+            store = Store.load(root)
+            store.save(root, {})
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "season"))), ["17"])
+
+
+def patch_store(minors):
+    store = Store()
+    everyone = {scramble("player-%d" % i) for i in range(10)}
+    for minor in minors:
+        store.add_match(compact_match(fake_match(version="16.%d.1" % minor), "NA1_%d" % minor, "NA1"), everyone)
+    return store
+
+
+class StorageStandardTests(unittest.TestCase):
+    def test_summaries_are_archived_forever(self):
+        with tempfile.TemporaryDirectory() as root:
+            patch_store(range(10, 18)).save(root, {})          # 8 patches: 3 fall out of patches/
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "patches"))),
+                             ["16.13", "16.14", "16.15", "16.16", "16.17"])
+            archived = sorted(os.listdir(os.path.join(root, config.ARCHIVE_DIR)))
+            self.assertEqual(archived, ["16.%d" % m for m in range(13, 18)])
+            # Next saves: the loaded store only knows 5 patches, yet the archive keeps the old ones.
+            later = Store.load(root)
+            later.add_match(compact_match(fake_match(version="16.18.1"), "NA1_18", "NA1"),
+                            {scramble("player-%d" % i) for i in range(10)})
+            later.save(root, {})
+            self.assertEqual(sorted(os.listdir(os.path.join(root, config.ARCHIVE_DIR))),
+                             ["16.%d" % m for m in range(13, 19)])
+            for name in os.listdir(os.path.join(root, config.ARCHIVE_DIR, "16.13")):
+                self.assertIn(name, ("summary.json", "champions.json"))
+
+    def test_archive_survives_cleanup_of_patch_folders(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = patch_store([10])
+            store.save(root, {})
+            for minor in range(11, 17):
+                store.add_match(compact_match(fake_match(version="16.%d.1" % minor), "NA1_%d" % minor, "NA1"),
+                                {scramble("player-%d" % i) for i in range(10)})
+            store.save(root, {})
+            self.assertFalse(os.path.exists(os.path.join(root, "patches", "16.10")))
+            self.assertTrue(os.path.exists(os.path.join(root, config.ARCHIVE_DIR, "16.10", "summary.json")))
+
+    def test_players_files_only_for_newest_patches(self):
+        with tempfile.TemporaryDirectory() as root:
+            patch_store(range(14, 20)).save(root, {})
+            have = sorted(n for n in os.listdir(os.path.join(root, "patches"))
+                          if os.path.exists(os.path.join(root, "patches", n, "players.json.gz")))
+            self.assertEqual(len(have), config.KEEP_PLAYER_PATCHES)
+            self.assertEqual(have, ["16.%d" % m for m in range(20 - config.KEEP_PLAYER_PATCHES, 20)])
+            # An older patch without its player file still loads (and keeps its other files).
+            loaded = Store.load(root)
+            self.assertEqual(loaded.patches["16.15"]["players"], {})
+            self.assertTrue(loaded.patches["16.15"]["champions"])
+
+    def test_cleanup_never_removes_current_or_previous_patch(self):
+        keep = (config.KEEP_PATCHES, config.KEEP_PLAYER_PATCHES, config.KEEP_SEASONS, config.KEEP_SCORE_FILES)
+        try:
+            config.KEEP_PATCHES = config.KEEP_PLAYER_PATCHES = config.KEEP_SCORE_FILES = 0
+            config.KEEP_SEASONS = 0
+            with tempfile.TemporaryDirectory() as root:
+                patch_store(range(10, 15)).save(root, {})
+                os.makedirs(os.path.join(root, "scores"))
+                for name in ("16.13.json", "16.14.json", "latest.json"):
+                    open(os.path.join(root, "scores", name), "w").write("{}")
+                prune_scores(root)
+                self.assertEqual(sorted(os.listdir(os.path.join(root, "patches"))), ["16.13", "16.14"])
+                for name in ("16.13", "16.14"):
+                    self.assertTrue(os.path.exists(os.path.join(root, "patches", name, "players.json.gz")))
+                self.assertEqual(sorted(os.listdir(os.path.join(root, "season"))), ["16"])
+                self.assertEqual(sorted(os.listdir(os.path.join(root, "scores"))),
+                                 ["16.13.json", "16.14.json", "latest.json"])
+        finally:
+            (config.KEEP_PATCHES, config.KEEP_PLAYER_PATCHES, config.KEEP_SEASONS, config.KEEP_SCORE_FILES) = keep
+
+    def test_scores_keep_last_20_patches_and_latest(self):
+        with tempfile.TemporaryDirectory() as root:
+            folder = os.path.join(root, "scores")
+            os.makedirs(folder)
+            for minor in range(1, 25):
+                open(os.path.join(folder, "16.%d.json" % minor), "w").write("{}")
+            open(os.path.join(folder, "latest.json"), "w").write("{}")
+            removed = prune_scores(root)
+            self.assertEqual(config.KEEP_SCORE_FILES, 20)
+            self.assertEqual(sorted(removed), ["16.1", "16.2", "16.3", "16.4"])
+            left = os.listdir(folder)
+            self.assertEqual(len(left), 21)
+            self.assertIn("latest.json", left)
+            self.assertIn("16.24.json", left)
+            self.assertNotIn("16.4.json", left)
+
+    def test_size_watch_warns_at_40_mb(self):
+        with tempfile.TemporaryDirectory() as root:
+            with open(os.path.join(root, "small.bin"), "wb") as f:
+                f.write(b"x" * 1000)
+            line, warn = size_report(root)
+            self.assertFalse(warn)
+            self.assertIn("small.bin", line)
+            self.assertEqual(config.SIZE_WARNING_MB, 40)
+            os.makedirs(os.path.join(root, "season"))
+            with open(os.path.join(root, "season", "big.bin"), "wb") as f:
+                f.truncate(40 * 1_000_000)   # sparse file, no real disk used
+            self.assertEqual(biggest_file(root)[1], os.path.join("season", "big.bin"))
+            line, warn = size_report(root)
+            self.assertTrue(warn)
+            self.assertTrue(line.startswith("WARNING"))
 
 
 class JungleTests(unittest.TestCase):
