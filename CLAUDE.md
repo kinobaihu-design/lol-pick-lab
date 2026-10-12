@@ -218,6 +218,15 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
 
+## Brief changes v0.45 (no change to the Pick Score), Oct 12, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Card adder CANCELLED.** Adding cards stays a chat process: the owner tells Claude in chat, Claude fact-checks the kit and drafts the card with them, Claude Code adds it. Reason: the fact-check against the kit can't be done by the page, and reliability matters more than speed. (A draft was built and discarded before any commit; nothing was pushed.)
+- Range groups: no change (Short ≤500, Medium 525–575, Long ≥600 as before).
+- **Phase 3 is now only the smooth run:** 7 days with no collector failures, no red "scores are old" warnings, and no code changes. Mastery review done and card editing already worked live on Oct 11.
+- **Code freeze** from Oct 12 until the owner says so.
+
 ## Brief changes v0.44 (no change to the Pick Score), Oct 11, 2026
 
 Pasted from the owner; the live brief has the full details.
@@ -414,8 +423,7 @@ Pasted from the owner; the live brief has the full details.
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
 **Phase 3, Road to 1.0**
-- [ ] Admin page: add new cards
-- [ ] Smooth run: one full patch with no collector failures and no red "scores are old" warnings, and every admin action working live once. Then the site is v1.0.
+- [ ] Smooth run: 7 days with no collector failures, no red "scores are old" warnings and no code changes. Then the site is v1.0. (Adding cards stays a chat process; the admin card adder was cancelled in v0.45.)
 
 **Phase 4, after 1.0**
 - [ ] Weight tuning (1.x)
@@ -462,6 +470,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v0.45** (Oct 12, 2026): no score change. Card adder cancelled (cards are added through chat); Phase 3 = smooth run only; code freeze.
 - **v0.44** (Oct 11, 2026): no score change. Draft helper, builds and ban suggestions removed for good; Road to 1.0; version numbering rule; data storage standard.
 - **v0.43** (Oct 11, 2026): no score change. Admin page card editing (mastery + traits) with Comfort preview, one commit per edit, quick rescore workflow; the card files become the source of truth.
 - **v0.42** (Oct 11, 2026): no score change. "Last mastery review: patch X" reminder on the Comfort tab (one setting in `scoring/review.json`); Admin page added to the board (later).
