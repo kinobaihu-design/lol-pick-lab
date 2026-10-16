@@ -240,6 +240,18 @@ def passes_filters(c):
 # ---------------------------------------------------------------- stage 2: OTP
 
 
+def read_season_players(root, season_name):
+    """Season totals per player code: from the 16 pieces (v1.1) or the old single file. {} if none is saved."""
+    folder = os.path.join(root, "season", season_name)
+    if os.path.exists(os.path.join(folder, "season.json")):
+        players = {}
+        for piece in "0123456789abcdef":
+            players.update(read_json(os.path.join(folder, "players-%s.json.gz" % piece))["players"])
+        return players
+    legacy = os.path.join(folder, "players.json.gz")
+    return read_json(legacy)["players"] if os.path.exists(legacy) else {}
+
+
 def otp_numbers(root, patches, eligible_ids):
     """For each eligible champion: OTP players, their bot-lane games and wins (and, for display only,
     their games on it in every role).
@@ -268,8 +280,7 @@ def otp_numbers(root, patches, eligible_ids):
                     row[1] += wins
 
     season_name = patches[-1].name.split(".")[0]
-    season_path = os.path.join(root, "season", season_name, "players.json.gz")
-    season = read_json(season_path)["players"] if os.path.exists(season_path) else {}
+    season = read_season_players(root, season_name)
 
     result = {c: {"players": 0, "games": 0, "wins": 0, "all_role_games": 0} for c in wanted}
     for code, (total, champs) in per_player.items():

@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from . import config
 from .riot import KeyRejected, NotFound, RequestFailed, RiotClient
-from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret, prune_scores, size_report,
+from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret, prune_scores, size_lines,
                     scramble, win_rate)
 
 APEX_TIERS = ("challengerleagues", "grandmasterleagues", "masterleagues")
@@ -311,6 +311,8 @@ class Run:
                         del state[code]  # no longer Diamond+
             info = self.run_info(final)
             self.store.save(self.args.data_dir, info)
+            if self.store.pruned_players:
+                log("Dropped %d small, inactive players from the season totals" % self.store.pruned_players)
             self.score()
         log("Saved data (%s)" % ("final" if final else "checkpoint"))
         if self.args.push:
@@ -422,7 +424,7 @@ def write_step_summary(info, data_dir=None):
         lines.append("| %s | %d | %d | %d |" % (name, c.get("requests", 0), c.get("rate_limited", 0),
                                                c.get("errors", 0)))
     if data_dir:
-        lines += ["", size_report(data_dir)[0]]
+        lines += [""] + size_lines(data_dir)[0]
     with open(path, "a") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -491,7 +493,8 @@ def main():
     progress(run)
     info = run.save(final=True)
     write_step_summary(info, args.data_dir)
-    log(size_report(args.data_dir)[0])
+    for line in size_lines(args.data_dir)[0]:
+        log(line)
     total = sum(s["games_counted"] for s in info["servers"].values())
     log("Done: %d new games counted." % total)
     if run.key_problem:

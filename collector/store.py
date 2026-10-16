@@ -24,6 +24,106 @@ PATCH_PATTERN = re.compile(r"^\d+\.\d+$")
 
 MIN_PATCHES = 2  # cleanup never keeps fewer: the current and the previous patch
 
+# Season totals are saved in 16 pieces (v1.1): season/<season>/players-<0-f>.json.gz, by the first character of the
+# player code, plus season.json (champion list, conversion day). The old single file is still understood.
+PIECES = "0123456789abcdef"
+SEASON_FILE = "season.json"
+LEGACY_SEASON_FILE = "players.json.gz"
+PRECONVERSION_FILE = "players-preconversion.json.gz"
+SEASON_FORMAT = 2
+
+
+def _today():
+    """Today as a day number (days since 1970). One place, so tests can set the date."""
+    return int(time.time() // 86400)
+
+
+def piece_of(code):
+    first = code[:1].lower()
+    return first if first and first in PIECES else "0"
+
+
+def piece_name(piece):
+    return "players-%s.json.gz" % piece
+
+
+def new_season():
+    return {"champions": set(), "players": {}, "seen": {}, "converted_day": None, "legacy": False}
+
+
+def read_season(folder, today=None):
+    """Season totals saved in `folder`: from the 16 pieces, or from the old single file (every player then counts
+    as seen today). None when nothing is saved there. Raises on a missing or damaged piece."""
+    meta_path = os.path.join(folder, SEASON_FILE)
+    if os.path.exists(meta_path):
+        meta = _read(meta_path)
+        season = new_season()
+        season["champions"] = set(meta["champions"])
+        season["converted_day"] = meta.get("converted_day")
+        for piece in PIECES:
+            data = _read(os.path.join(folder, piece_name(piece)))
+            season["players"].update(data["players"])
+            season["seen"].update(data["seen"])
+        return season
+    legacy = os.path.join(folder, LEGACY_SEASON_FILE)
+    if os.path.exists(legacy):
+        data = _read(legacy)
+        day = _today() if today is None else today
+        season = new_season()
+        season["champions"] = set(data["champions"])
+        season["players"] = data["players"]
+        season["seen"] = {code: day for code in data["players"]}
+        season["legacy"] = True
+        return season
+    return None
+
+
+def write_season(folder, season, today=None):
+    """Write the 16 pieces and season.json. The old single file is not touched here."""
+    day = _today() if today is None else today
+    groups = {piece: {"players": {}, "seen": {}} for piece in PIECES}
+    for code, counters in season["players"].items():
+        group = groups[piece_of(code)]
+        group["players"][code] = counters
+        group["seen"][code] = season["seen"].setdefault(code, day)
+    for piece, group in groups.items():
+        _write(os.path.join(folder, piece_name(piece)), group)
+    converted = season.get("converted_day")
+    if converted is None and season.get("legacy"):
+        converted = day
+    _write(os.path.join(folder, SEASON_FILE), {
+        "format": SEASON_FORMAT, "pieces": len(PIECES),
+        "champions": sorted(season["champions"], key=int), "converted_day": converted})
+    season["converted_day"] = converted
+
+
+def finish_conversion(folder, season, today=None):
+    """After the pieces were written and checked: rename the old single file so it is kept as a rollback copy,
+    and delete that copy PRECONVERSION_KEEP_DAYS after the conversion."""
+    day = _today() if today is None else today
+    legacy = os.path.join(folder, LEGACY_SEASON_FILE)
+    kept = os.path.join(folder, PRECONVERSION_FILE)
+    if os.path.exists(legacy):
+        if os.path.exists(kept):
+            os.remove(legacy)
+        else:
+            os.replace(legacy, kept)
+    season["legacy"] = False
+    converted = season.get("converted_day")
+    if os.path.exists(kept) and converted is not None and day >= converted + config.PRECONVERSION_KEEP_DAYS:
+        os.remove(kept)
+
+
+def season_fingerprint(season):
+    """What must not change when a season is saved and read back."""
+    games = wins = 0
+    for counters in season["players"].values():
+        for g, w in counters.values():
+            games += g
+            wins += w
+    return (len(season["players"]), sorted(season["champions"], key=int), games, wins,
+            sum(season["seen"].get(code, 0) for code in season["players"]) if season["seen"] else 0)
+
 
 class DataDamaged(Exception):
     """A saved file could not be read."""
@@ -165,7 +265,8 @@ class Store:
         self.processed = {s: {} for s in config.ALL_SERVERS}     # day -> set of game numbers
         self.processed_index = {s: set() for s in config.ALL_SERVERS}
         self.pending = {s: [] for s in config.ALL_SERVERS}
-        self.seasons = {}  # "16" -> {"champions": set of IDs, "players": code -> counts}
+        self.seasons = {}  # "16" -> {"champions": set of IDs, "players": code -> counts, "seen": code -> day number}
+        self.pruned_players = 0  # dropped as small and inactive in the last save
 
     # ---- processed games ----
 
@@ -242,11 +343,12 @@ class Store:
     # ---- season totals (for the OTP rule) ----
 
     def _season(self, season):
-        return self.seasons.setdefault(season, {"champions": set(), "players": {}})
+        return self.seasons.setdefault(season, new_season())
 
     def _add_to_season(self, patch_name, code, champ, tag, win, roles):
         season = self._season(season_of(patch_name))
         player = season["players"].setdefault(code, {})
+        season["seen"][code] = _today()
         _count(player, "all", win)
         if champ not in season["champions"] and _site_role_champion(roles):
             # Joins for the rest of the season. Its earlier games (this one
@@ -267,7 +369,9 @@ class Store:
             for code, champs in patch["players"].items():
                 if champ not in champs:
                     continue
-                player = season["players"].setdefault(code, {})
+                if code not in season["players"]:
+                    continue   # dropped from the season file as small and inactive: not brought back
+                player = season["players"][code]
                 for key in keys:
                     if key in champs:
                         _add(player, key, *champs[key])
@@ -297,6 +401,22 @@ class Store:
                             _add(player, "all", games, wins)
                         if key.split(":")[0] in season["champions"]:
                             _add(player, key, games, wins)
+
+    def prune_seasons(self, today=None):
+        """Drop players with SEASON_PRUNE_MAX_GAMES season games or fewer who haven't been seen for
+        SEASON_PRUNE_AFTER_DAYS days. Returns how many were dropped."""
+        day = _today() if today is None else today
+        cutoff = day - config.SEASON_PRUNE_AFTER_DAYS
+        dropped = 0
+        for season in self.seasons.values():
+            old = [code for code, counters in season["players"].items()
+                   if counters.get("all", [0, 0])[0] <= config.SEASON_PRUNE_MAX_GAMES
+                   and season["seen"].get(code, day) < cutoff]
+            for code in old:
+                del season["players"][code]
+                season["seen"].pop(code, None)
+            dropped += len(old)
+        return dropped
 
     # ---- summaries ----
 
@@ -360,14 +480,15 @@ class Store:
         for name in list(self.seasons):
             if name not in keep_seasons:
                 del self.seasons[name]
+        today = _today()
+        self.pruned_players = self.prune_seasons(today)
         seasons_dir = os.path.join(root, "season")
         os.makedirs(seasons_dir, exist_ok=True)
         for name in os.listdir(seasons_dir):
             if name not in self.seasons:
                 shutil.rmtree(os.path.join(seasons_dir, name))
         for name, season in self.seasons.items():
-            _write(os.path.join(seasons_dir, name, "players.json.gz"),
-                   {"champions": sorted(season["champions"], key=int), "players": season["players"]})
+            write_season(os.path.join(seasons_dir, name), season, today)
 
         state = os.path.join(root, "state")
         _write(os.path.join(state, "players.json.gz"), self.player_state)
@@ -380,7 +501,13 @@ class Store:
         with open(os.path.join(root, "README.md"), "w") as f:
             f.write(DATA_README)
 
-        Store.load(root)  # raises DataDamaged if anything didn't save properly
+        loaded = Store.load(root)  # raises DataDamaged if anything didn't save properly
+        for name, season in self.seasons.items():
+            # The season totals read back must be exactly what was written (also proves a conversion lost nothing).
+            if season_fingerprint(loaded.seasons[name]) != season_fingerprint(season):
+                raise DataDamaged("season %s changed while saving" % name)
+        for name, season in self.seasons.items():
+            finish_conversion(os.path.join(seasons_dir, name), season, today)
 
     @classmethod
     def load(cls, root):
@@ -416,8 +543,9 @@ class Store:
                 store.patches[name] = patch
             seasons_dir = os.path.join(root, "season")
             for name in os.listdir(seasons_dir) if os.path.isdir(seasons_dir) else []:
-                data = _read(os.path.join(seasons_dir, name, "players.json.gz"))
-                store.seasons[name] = {"champions": set(data["champions"]), "players": data["players"]}
+                season = read_season(os.path.join(seasons_dir, name))
+                if season is not None:
+                    store.seasons[name] = season
             store._seed_seasons()
         except Exception as error:
             raise DataDamaged("%s: %s" % (type(error).__name__, error))
@@ -470,6 +598,31 @@ def size_report(root):
         line = "WARNING: biggest saved file is %s, %.1f MB, at or over the %d MB warning line. Tell Alejandro." % (
             path, mb, config.SIZE_WARNING_MB)
     return line, mb >= config.SIZE_WARNING_MB
+
+
+def total_size(root):
+    return sum(os.path.getsize(os.path.join(folder, name)) for folder, _, files in os.walk(root) for name in files)
+
+
+def season_report(root):
+    """One line for the run summary: the season pieces and the biggest one."""
+    sizes = []
+    for folder, _, files in os.walk(os.path.join(root, "season")):
+        for name in files:
+            if name.startswith("players-") and name != PRECONVERSION_FILE and name.endswith(".json.gz"):
+                sizes.append((os.path.getsize(os.path.join(folder, name)), name))
+    if not sizes:
+        return "Season totals: no pieces saved yet."
+    biggest = max(sizes)
+    return "Season totals: %d pieces, biggest %s %.1f MB, together %.1f MB." % (
+        len(sizes), biggest[1], biggest[0] / 1_000_000, sum(size for size, _ in sizes) / 1_000_000)
+
+
+def size_lines(root):
+    """Lines for the run summary: biggest file (the 40 MB warning applies to it, so to each season piece too),
+    the season pieces, and the size of everything saved. Returns (lines, warning)."""
+    line, warn = size_report(root)
+    return [line, season_report(root), "All saved data together: %.1f MB." % (total_size(root) / 1_000_000)], warn
 
 
 def season_of(patch):
@@ -558,10 +711,16 @@ The last 5 patches are kept. `players.json.gz` is kept only for the newest few
 `summary.json` and `champions.json` of every patch, kept forever (tiny). They
 survive the cleanup of the `patches/` folders.
 
-## season/<season>/players.json.gz
-Running totals for the whole season (season 16 = patches 16.x), never pruned
-during the season; only the current season is kept, for the "50 games this season" part of the OTP rule:
-- `players`: per scrambled player code, `"all"` = `[games, wins]` across every
+## season/<season>/
+Saved in 16 pieces by the first character of the player code
+(`players-0.json.gz` ... `players-f.json.gz`), plus `season.json` (the champion
+list and the day the pieces were made). Each piece holds `players` and `seen`
+(the last day each player was counted). Players with 5 games or fewer that have
+not been seen for 30 days are dropped. `players-preconversion.json.gz` is the
+old single file, kept for 7 days after the split as a rollback copy.
+Running totals for the whole season (season 16 = patches 16.x); only the
+current season is kept, for the "50 games this season" part of the OTP rule:
+- `players` (in each piece): per scrambled player code, `"all"` = `[games, wins]` across every
   champion, plus `[games, wins]` per champion ID and per `"ID:B"` / `"ID:S"` /
   `"ID:J"`, only for bot-lane, support and jungle champions.
 - `champions`: the champion IDs counted this season (at least 200 games in a

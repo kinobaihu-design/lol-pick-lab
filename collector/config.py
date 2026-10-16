@@ -49,6 +49,11 @@ ROLE_TAGS = {"BOTTOM": "B", "UTILITY": "S", "JUNGLE": "J"}
 SEASON_CHAMPION_MIN_GAMES = 200
 SEASON_CHAMPION_MIN_SHARE = 0.10
 KEEP_SEASONS = 1                # seasons of player totals kept (the current one only)
+# v1.1: the season file is saved in 16 pieces (by the first character of the player code), and players with
+# few games who haven't been seen for a while are dropped, so it can't grow without limit.
+SEASON_PRUNE_MAX_GAMES = 5      # a player with this many season games or fewer ...
+SEASON_PRUNE_AFTER_DAYS = 30    # ... and not seen for this many days is dropped from the season file
+PRECONVERSION_KEEP_DAYS = 7     # the old single season file is kept this long after the split, as a rollback copy
 
 # Personal key limits per routing value: (requests, seconds). Riot's response
 # headers replace these if they differ. We stay a little under them.
@@ -79,7 +84,7 @@ MIN_GAME_SECONDS = 300        # shorter games are remakes and are skipped
 # Run timing.
 DEFAULT_MAX_MINUTES = 300
 CHECKPOINT_MINUTES = 60
-FINAL_SAVE_RESERVE_MINUTES = 8
+FINAL_SAVE_RESERVE_MINUTES = 15
 
 
 def server_shares(region):

@@ -138,7 +138,7 @@ class NoUnsaltedCodesTests(unittest.TestCase):
                 store.save(root, {})
                 old = {st.unsalted_code(p) for p in puuids}
                 self.assertEqual(convert_codes.find_leftovers(root, old), [])
-                season = st._read(os.path.join(root, "season", "16", "players.json.gz"))["players"]
+                season = st.read_season(os.path.join(root, "season", "16"))["players"]
                 self.assertIn(st.scramble("player-3"), season)
                 self.assertNotIn("player-3", json.dumps(season))
                 self.assertEqual(st.Store.load(root).seasons["16"]["players"].keys(), season.keys())
