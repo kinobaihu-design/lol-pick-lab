@@ -218,6 +218,19 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
 
+## Brief changes v1.0 + v1.1 (no change to the Pick Score), Oct 16, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **v1.0: Road to 1.0 done.** The smooth run was shortened to 4 days by the owner's call (19 of 19 runs clean). The code freeze ends.
+- **v1.1: season file safe for a full year** (planned first, built after the owner's OK):
+  1. Split `season/16/players.json.gz` into 16 pieces by player code; one-time conversion that loses nothing (counts before = counts after, proven).
+  2. Drop players with 5 games or fewer who haven't been seen for 30 days.
+  3. Save reserve 8 → 15 minutes; hourly saves stay.
+  4. Run summary shows the biggest piece and the total size; the 40 MB warning applies to the biggest piece.
+  5. Season-file repair and new-champion back-fill must keep working (tests).
+  6. Explain the `data-backup` branch; never delete it without the owner's OK.
+
 ## Brief changes v0.45 (no change to the Pick Score), Oct 12, 2026
 
 Pasted from the owner; the live brief has the full details.
@@ -423,7 +436,7 @@ Pasted from the owner; the live brief has the full details.
 - [ ] Compare the output with the owner's manual picks for one patch and tune the weights
 
 **Phase 3, Road to 1.0**
-- [ ] Smooth run: 7 days with no collector failures, no red "scores are old" warnings and no code changes. Then the site is v1.0. (Adding cards stays a chat process; the admin card adder was cancelled in v0.45.)
+- [x] Smooth run (shortened to 4 days by the owner, 19 of 19 runs clean; v1.0, Oct 16): 7 days with no collector failures, no red "scores are old" warnings and no code changes. Then the site is v1.0. (Adding cards stays a chat process; the admin card adder was cancelled in v0.45.)
 
 **Phase 4, after 1.0**
 - [ ] Weight tuning (1.x)
@@ -470,6 +483,8 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v1.1** (Oct 16, 2026): no score change. Season file safe for a full year (in planning; see "Brief changes v1.0 + v1.1").
+- **v1.0** (Oct 16, 2026): Road to 1.0 done; code freeze ends.
 - **v0.45** (Oct 12, 2026): no score change. Card adder cancelled (cards are added through chat); Phase 3 = smooth run only; code freeze.
 - **v0.44** (Oct 11, 2026): no score change. Draft helper, builds and ban suggestions removed for good; Road to 1.0; version numbering rule; data storage standard.
 - **v0.43** (Oct 11, 2026): no score change. Admin page card editing (mastery + traits) with Comfort preview, one commit per edit, quick rescore workflow; the card files become the source of truth.
