@@ -76,6 +76,7 @@ KEEP_PLAYER_PATCHES = 3       # patches that keep players.json.gz (owner's decis
                               # new-champion back-fill read these files)
 KEEP_SCORE_FILES = 20         # scores/<patch>.json files kept (latest.json always stays)
 ARCHIVE_DIR = "archive"       # tiny summary.json + champions.json per patch, kept forever
+MEMORY_WARNING_SHARE = 0.60   # the run summary warns when peak memory passes this share of the runner's memory
 SIZE_WARNING_MB = 40          # the run summary warns when the biggest saved file is this big
 PROCESSED_KEEP_DAYS = 14      # must stay above MAX_LOOKBACK_DAYS
 MAX_PENDING_PER_SERVER = 50000

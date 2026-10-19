@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from . import config
 from .riot import KeyRejected, NotFound, RequestFailed, RiotClient
-from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret, prune_scores, size_lines,
+from .store import (CodesMismatch, DataDamaged, MissingSecret, Store, compact_match, player_secret, memory_report, prune_scores, size_lines,
                     scramble, win_rate)
 
 APEX_TIERS = ("challengerleagues", "grandmasterleagues", "masterleagues")
@@ -404,6 +404,14 @@ def progress(run):
     log("Progress: " + "; ".join(parts))
 
 
+def season_players(info):
+    """Players in the newest season's totals (from the run info)."""
+    seasons = info.get("seasons") or {}
+    if not seasons:
+        return 0
+    return seasons[max(seasons, key=int)].get("players", 0)
+
+
 def write_step_summary(info, data_dir=None):
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not path:
@@ -424,7 +432,7 @@ def write_step_summary(info, data_dir=None):
         lines.append("| %s | %d | %d | %d |" % (name, c.get("requests", 0), c.get("rate_limited", 0),
                                                c.get("errors", 0)))
     if data_dir:
-        lines += [""] + size_lines(data_dir)[0]
+        lines += [""] + size_lines(data_dir)[0] + memory_report(season_players(info))[0]
     with open(path, "a") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -493,7 +501,7 @@ def main():
     progress(run)
     info = run.save(final=True)
     write_step_summary(info, args.data_dir)
-    for line in size_lines(args.data_dir)[0]:
+    for line in size_lines(args.data_dir)[0] + memory_report(season_players(info))[0]:
         log(line)
     total = sum(s["games_counted"] for s in info["servers"].values())
     log("Done: %d new games counted." % total)

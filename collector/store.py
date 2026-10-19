@@ -12,7 +12,9 @@ import hmac
 import json
 import os
 import re
+import resource
 import shutil
+import sys
 import time
 from datetime import datetime, timezone
 
@@ -623,6 +625,48 @@ def size_lines(root):
     the season pieces, and the size of everything saved. Returns (lines, warning)."""
     line, warn = size_report(root)
     return [line, season_report(root), "All saved data together: %.1f MB." % (total_size(root) / 1_000_000)], warn
+
+
+def peak_memory_bytes(usage=None, platform=None):
+    """Highest memory this process and its children (the scoring step) used, in bytes.
+    Linux reports ru_maxrss in KB, macOS in bytes."""
+    scale = 1 if (platform or sys.platform) == "darwin" else 1024
+    if usage is not None:
+        return usage * scale
+    return max(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+               resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) * scale
+
+
+def total_memory_bytes():
+    """The machine's total memory (Linux /proc/meminfo, else sysconf). None if it can't be found."""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError, AttributeError):
+        return None
+
+
+def memory_report(season_players, peak=None, total=None):
+    """Run-summary lines: peak memory, the runner's total memory, the season player count.
+    Returns (lines, warning); the warning is on when the peak passes MEMORY_WARNING_SHARE of the total."""
+    peak = peak_memory_bytes() if peak is None else peak
+    total = total_memory_bytes() if total is None else total
+    gb = lambda n: n / 1e9
+    players = "Season totals hold %s players." % format(int(season_players), ",")
+    if not total:
+        return ["Memory: peak %.1f GB (runner's total memory unknown). %s" % (gb(peak), players)], False
+    share = peak / total
+    warn = share > config.MEMORY_WARNING_SHARE
+    line = "Memory: peak %.1f GB of %.1f GB on the runner (%d%%). %s" % (gb(peak), gb(total), round(100 * share), players)
+    if warn:
+        return ["WARNING: peak memory is over %d%% of the runner's memory. Tell Alejandro." % round(100 * config.MEMORY_WARNING_SHARE), line], True
+    return [line], False
 
 
 def season_of(patch):

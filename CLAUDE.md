@@ -218,6 +218,13 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
 
+## Brief changes v1.2 (no change to the Pick Score), Oct 19, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- Storage audit (Oct 19): disk is safe for a full year, so the other fixes (compact "last seen", binary format, harder dropping, 2 players files) are **skipped**. The real risk is runner memory: the season file takes about 0.9 GB and 2 patch files about 1.1 GB in memory.
+- **Built:** the run summary and log show peak memory, the runner's total memory (from `/proc/meminfo`) and the season player count, with a WARNING when the peak passes 60% of the runner's memory (`MEMORY_WARNING_SHARE` in `collector/config.py`; `memory_report` in `collector/store.py`). Tests: `MemoryLineTests`.
+
 ## Brief changes v1.0 + v1.1 (no change to the Pick Score), Oct 16, 2026
 
 Pasted from the owner; the live brief has the full details.
@@ -491,6 +498,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v1.2** (Oct 19, 2026): no score change. Run summary shows peak memory, the runner's memory and the season player count, with a 60% warning.
 - **v1.1** (Oct 16, 2026): no score change. Season file safe for a full year (in planning; see "Brief changes v1.0 + v1.1").
 - **v1.0** (Oct 16, 2026): Road to 1.0 done; code freeze ends.
 - **v0.45** (Oct 12, 2026): no score change. Card adder cancelled (cards are added through chat); Phase 3 = smooth run only; code freeze.

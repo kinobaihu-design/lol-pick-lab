@@ -16,7 +16,7 @@ from collector import config  # noqa: E402
 from collector.riot import Limiter, parse_limits  # noqa: E402
 from collector import convert_season, store as store_module  # noqa: E402
 from collector.store import (DataDamaged, Store, biggest_file, compact_match, prune_scores, read_season, scramble,  # noqa: E402
-                             season_report, size_lines, size_report, total_size, write_season)
+                             memory_report, peak_memory_bytes, season_report, size_lines, size_report, total_size, write_season)
 
 POSITIONS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
 
@@ -522,6 +522,47 @@ class SeasonPruneTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             write_legacy(root, store)
             self.assertEqual(set(model.read_season_players(root, "16")), set(store.seasons["16"]["players"]))
+
+
+class MemoryLineTests(unittest.TestCase):
+    GB = 1_000_000_000
+
+    def test_normal_line_has_peak_total_and_season_players(self):
+        lines, warn = memory_report(461924, peak=2 * self.GB, total=16 * self.GB)
+        self.assertFalse(warn)
+        self.assertEqual(lines, ["Memory: peak 2.0 GB of 16.0 GB on the runner (12%). Season totals hold 461,924 players."])
+
+    def test_warning_when_peak_passes_60_percent_of_the_runners_memory(self):
+        self.assertEqual(config.MEMORY_WARNING_SHARE, 0.6)
+        lines, warn = memory_report(1000000, peak=int(9.7 * self.GB), total=16 * self.GB)    # 61%
+        self.assertTrue(warn)
+        self.assertTrue(lines[0].startswith("WARNING: peak memory is over 60%"))
+        self.assertIn("61%", lines[1])
+        _, at_limit = memory_report(1, peak=int(9.6 * self.GB), total=16 * self.GB)           # exactly 60%: no warning
+        self.assertFalse(at_limit)
+        _, small_runner = memory_report(1, peak=5 * self.GB, total=7 * self.GB)               # a 7 GB runner is over the line
+        self.assertTrue(small_runner)
+
+    def test_unknown_runner_memory_gives_a_line_and_no_warning(self):
+        lines, warn = memory_report(5, peak=self.GB, total=0)
+        self.assertFalse(warn)
+        self.assertIn("unknown", lines[0])
+        self.assertIn("5 players", lines[0])
+
+    def test_peak_memory_units_and_real_reading(self):
+        self.assertEqual(peak_memory_bytes(2048, platform="linux"), 2048 * 1024)    # Linux counts KB
+        self.assertEqual(peak_memory_bytes(2048, platform="darwin"), 2048)          # macOS counts bytes
+        self.assertGreater(peak_memory_bytes(), 10_000_000)
+        lines, _ = memory_report(3)                                                  # the real machine
+        self.assertRegex(lines[-1], r"^Memory: peak [0-9.]+ GB .*Season totals hold 3 players\.$")
+
+    def test_the_run_summary_and_log_use_it(self):
+        from collector import main as collector_main
+        self.assertEqual(collector_main.season_players({"seasons": {"15": {"players": 9}, "16": {"players": 12}}}), 12)
+        self.assertEqual(collector_main.season_players({}), 0)
+        with open(collector_main.__file__) as f:
+            code = f.read()
+        self.assertGreaterEqual(code.count("memory_report(season_players(info))"), 2)     # step summary and log
 
 
 class SaveReserveAndSizeTests(unittest.TestCase):
