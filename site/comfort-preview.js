@@ -91,7 +91,29 @@
     };
   }
 
-  var api = { CONFIG: C, normalise: normalise, traitScore: traitScore, comfort: comfort, traitAverage: traitAverage, preview: preview };
+  // Several pending changes at once (the admin page's "Save all"): [{champion, field, value}, ...], any number of
+  // champions. Returns the trait average before and after, and for every changed champion its Comfort now and after.
+  function previewBatch(cards, rankedNames, changes) {
+    var after = cards.map(function (c) { return c; });
+    var touched = {};
+    changes.forEach(function (change) {
+      var index = -1;
+      after.forEach(function (c, i) { if (c.name === change.champion) index = i; });
+      if (index < 0) return;
+      after[index] = withChange(after[index], change.field, change.value);
+      touched[change.champion] = index;
+    });
+    var avgBefore = traitAverage(cards, rankedNames);
+    var avgAfter = traitAverage(after, rankedNames);
+    var byChampion = {};
+    Object.keys(touched).forEach(function (name) {
+      var i = touched[name];
+      byChampion[name] = { before: comfort(cards[i], avgBefore), after: comfort(after[i], avgAfter) };
+    });
+    return { traitAverageBefore: avgBefore, traitAverageAfter: avgAfter, byChampion: byChampion };
+  }
+
+  var api = { previewBatch: previewBatch, CONFIG: C, normalise: normalise, traitScore: traitScore, comfort: comfort, traitAverage: traitAverage, preview: preview };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ComfortPreview = api;
 })(typeof window !== "undefined" ? window : this);

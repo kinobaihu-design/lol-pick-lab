@@ -6,7 +6,8 @@ const path = require("node:path");
 const A = require("../lib/admin-cards.js");
 const R = require("../lib/admin-review.js");
 
-const ENV = { ADMIN_PASSWORD: "correct horse battery staple", GITHUB_TOKEN: "fake-token-for-tests" };
+const S = require("./admin_session.js");
+const ENV = S.ENV;
 const CARDS_TEXT = fs.readFileSync(path.join(__dirname, "..", "scoring", "cards.json"), "utf8");
 
 // A fake GitHub holding the card file. `options.movesBeforePatch`: how many times main "moves" under us.
@@ -32,20 +33,29 @@ function fakeWorld(options) {
     return reply(404, {});
   };
   world.sleep = async function (ms) { world.sleeps.push(ms); };
-  world.deps = { fetch: world.fetch, sleep: world.sleep };
+  world.deps = { fetch: world.fetch, sleep: world.sleep, now: () => S.NOW };
   return world;
 }
-const post = (extra) => ({ method: "POST", body: Object.assign({ password: ENV.ADMIN_PASSWORD }, extra) });
+// A single change object is sent as a batch of one (the request is always {changes: [...]}).
+const post = (extra) => S.request("POST", extra && extra.changes ? extra : { changes: [extra] });
+const batch = (changes) => S.request("POST", { changes: changes });
 const mastery = (champion, from, value) => post({ champion: champion, field: "mastery", from: from, value: value });
 const parse = (text) => JSON.parse(text);
 const card = (text, name) => parse(text).cards.find((c) => c.name === name);
 
-test("wrong password: waits, says so, reads nothing", async () => {
+test("not logged in: 401 'Please log in', no waiting, nothing read", async () => {
   const w = fakeWorld();
-  const out = await A.handle({ method: "POST", body: { password: "nope", champion: "Jinx", field: "mastery", from: "good", value: "main" } }, ENV, w.deps);
-  assert.strictEqual(out.status, 401);
-  assert.strictEqual(out.body.message, "Wrong password");
-  assert.deepStrictEqual(w.sleeps, [3000]);
+  const change = { champion: "Jinx", field: "mastery", from: "good", value: "main" };
+  const noCookie = { method: "POST", body: { changes: [change] }, headers: { "x-admin-request": "1" } };
+  const noHeader = { method: "POST", body: { changes: [change] }, headers: { cookie: S.cookieFor() } };
+  const old = S.request("POST", { changes: [change] }, { headers: { cookie: S.cookieFor(ENV, S.NOW - 31 * 24 * 3600 * 1000), "x-admin-request": "1" } });
+  const otherKey = S.request("POST", { changes: [change] }, { headers: { cookie: S.cookieFor({ ADMIN_PASSWORD: "another password", GITHUB_TOKEN: "x" }), "x-admin-request": "1" } });
+  for (const request of [noCookie, noHeader, old, otherKey]) {
+    const out = await A.handle(request, ENV, w.deps);
+    assert.strictEqual(out.status, 401);
+    assert.strictEqual(out.body.message, "Please log in");
+  }
+  assert.deepStrictEqual(w.sleeps, []);
   assert.strictEqual(w.calls.length, 0);
 });
 
@@ -222,4 +232,114 @@ test("secrets never appear in an answer", async () => {
     const text = JSON.stringify([await A.handle(mastery("Jinx", "good", "main"), ENV, w.deps), await A.handle({ method: "GET" }, ENV, w.deps)]);
     assert.ok(text.indexOf(ENV.ADMIN_PASSWORD) < 0 && text.indexOf(ENV.GITHUB_TOKEN) < 0);
   }
+});
+
+// ---- v1.5: Save all = one batch, one commit
+
+test("a batch: several champions and fields, ONE commit, ONE ref update, readable message with every change", async () => {
+  const w = fakeWorld();
+  const changes = [
+    { champion: "Jinx", field: "mastery", from: "good", value: "main" },
+    { champion: "Sivir", field: "aoe", from: "high", value: "mid" },
+    { champion: "Sivir", field: "cc", from: "none", value: "low" },
+    { champion: "Ashe", field: "mastery", from: "average", value: "good" }
+  ];
+  const out = await A.handle(batch(changes), ENV, w.deps);
+  assert.strictEqual(out.status, 200, JSON.stringify(out.body));
+  assert.strictEqual(out.body.count, 4);
+  assert.strictEqual(w.commits.length, 1);
+  assert.strictEqual(w.refUpdates, 1);
+  assert.strictEqual(w.trees.length, 1);
+  assert.deepStrictEqual(w.trees[0].tree.map((t) => t.path).sort(), ["scoring/cards.json", "site/data/cards.json"]);
+  const message = w.commits[0].message;
+  assert.strictEqual(message.split("\n")[0], "Card edits: 4 changes on 3 champions (Jinx, Sivir, Ashe)");
+  for (const part of ["- Jinx mastery Good → Main", "- Sivir AoE High → Mid", "- Sivir CC None → Low", "- Ashe mastery Average → Good"]) {
+    assert.ok(message.indexOf(part) > 0, part);
+  }
+  const after = w.trees[0].tree[0].content;
+  assert.strictEqual(card(after, "Jinx").mastery, "main");
+  assert.strictEqual(card(after, "Sivir").traits.aoe, "mid");
+  assert.strictEqual(card(after, "Sivir").traits.cc, "low");
+  assert.strictEqual(card(after, "Ashe").mastery, "good");
+  assert.ok(out.body.commit_url.indexOf("/commit/commit1") > 0);
+});
+
+test("a batch changes only what was asked: every other card and line is byte for byte the same", async () => {
+  const w = fakeWorld();
+  await A.handle(batch([{ champion: "Jinx", field: "mastery", from: "good", value: "main" }, { champion: "Ashe", field: "mastery", from: "average", value: "good" }]), ENV, w.deps);
+  const oldLines = CARDS_TEXT.split("\n"), newLines = w.trees[0].tree[0].content.split("\n");
+  assert.strictEqual(oldLines.length, newLines.length);
+  const different = oldLines.map((l, i) => [l, newLines[i]]).filter(([x, y]) => x !== y);
+  assert.deepStrictEqual(different, [['   "mastery": "good",', '   "mastery": "main",'], ['   "mastery": "average",', '   "mastery": "good",']]);
+});
+
+test("a batch of one keeps the short message", async () => {
+  const w = fakeWorld();
+  await A.handle(batch([{ champion: "Jinx", field: "mastery", from: "good", value: "main" }]), ENV, w.deps);
+  assert.strictEqual(w.commits[0].message, "Card edit: Jinx mastery Good → Main");
+});
+
+test("a batch of three keeps every change in the first line", async () => {
+  const w = fakeWorld();
+  await A.handle(batch([{ champion: "Jinx", field: "mastery", from: "good", value: "main" }, { champion: "Ashe", field: "mastery", from: "average", value: "good" },
+    { champion: "Sivir", field: "aoe", from: "high", value: "mid" }]), ENV, w.deps);
+  assert.strictEqual(w.commits[0].message.split("\n")[0], "Card edits: Jinx mastery Good → Main; Ashe mastery Average → Good; Sivir AoE High → Mid");
+});
+
+test("one stale change in a batch refuses the whole batch and writes nothing", async () => {
+  const w = fakeWorld();
+  const out = await A.handle(batch([
+    { champion: "Jinx", field: "mastery", from: "good", value: "main" },
+    { champion: "Ashe", field: "mastery", from: "main", value: "good" }          // Ashe is not Main in the file
+  ]), ENV, w.deps);
+  assert.strictEqual(out.status, 409);
+  assert.strictEqual(out.body.message, A.CLASH);
+  assert.strictEqual(w.commits.length, 0);
+  assert.strictEqual(w.refUpdates, 0);
+});
+
+test("an invalid change anywhere in a batch refuses everything before GitHub is touched", async () => {
+  for (const changes of [
+    [{ champion: "Jinx", field: "mastery", from: "good", value: "main" }, { champion: "Ashe", field: "mastery", from: "average", value: "godlike" }],
+    [{ champion: "Jinx", field: "mastery", from: "good", value: "main" }, { champion: "Jinx", field: "mastery", from: "good", value: "average" }],   // same field twice
+    [], [null], "nope", { champion: "Jinx" },
+    Array.from({ length: A.MAX_CHANGES + 1 }, (_, i) => ({ champion: "Jinx", field: "mastery", from: "good", value: "main" }))
+  ]) {
+    const w = fakeWorld();
+    const out = await A.handle(S.request("POST", { changes: changes }), ENV, w.deps);
+    assert.strictEqual(out.status, 400, JSON.stringify(changes).slice(0, 80));
+    assert.strictEqual(w.calls.length, 0);
+  }
+  const w = fakeWorld();
+  assert.strictEqual((await A.handle(S.request("POST", { changes: [{ champion: "Jinx", field: "mastery", from: "good", value: "main" }], extra: 1 }), ENV, w.deps)).status, 400);
+  assert.strictEqual((await A.handle(S.request("POST", { password: "x", changes: [{ champion: "Jinx", field: "mastery", from: "good", value: "main" }] }), ENV, w.deps)).status, 400);
+  assert.strictEqual(w.calls.length, 0);
+});
+
+test("a batch that changes things back and forth ends exactly where it should (undo in the page means no change is sent)", async () => {
+  const w = fakeWorld();
+  const first = await A.handle(batch([{ champion: "Jinx", field: "mastery", from: "good", value: "main" }, { champion: "Sivir", field: "aoe", from: "high", value: "none" }]), ENV, w.deps);
+  assert.strictEqual(first.status, 200);
+  const edited = w.trees[0].tree[0].content;
+  const w2 = fakeWorld({ text: edited });
+  await A.handle(batch([{ champion: "Jinx", field: "mastery", from: "main", value: "good" }, { champion: "Sivir", field: "aoe", from: "none", value: "high" }]), ENV, w2.deps);
+  assert.strictEqual(w2.trees[0].tree[0].content, CARDS_TEXT);
+});
+
+test("main moves while saving a batch: it is read again and the whole batch is kept", async () => {
+  const w = fakeWorld({ movesBeforePatch: 1, otherEdit: (t) => t.replace('"mastery": "below_average"', '"mastery": "average"') });
+  const out = await A.handle(batch([{ champion: "Jinx", field: "mastery", from: "good", value: "main" }, { champion: "Ashe", field: "mastery", from: "average", value: "good" }]), ENV, w.deps);
+  assert.strictEqual(out.status, 200, JSON.stringify(out.body));
+  assert.strictEqual(w.commits.length, 2);
+  const final = w.trees[1].tree[0].content;
+  assert.strictEqual(card(final, "Jinx").mastery, "main");
+  assert.strictEqual(card(final, "Ashe").mastery, "good");
+});
+
+test("the list needs no login (the cards are public), and an old single-change request is no longer accepted", async () => {
+  const w = fakeWorld();
+  const list = await A.handle({ method: "GET" }, ENV, w.deps);
+  assert.ok(list.body.ok);
+  const old = S.request("POST", { champion: "Jinx", field: "mastery", from: "good", value: "main" });
+  assert.strictEqual((await A.handle(old, ENV, w.deps)).status, 400);
 });

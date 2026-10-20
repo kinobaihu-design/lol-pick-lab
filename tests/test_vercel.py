@@ -75,19 +75,34 @@ class AdminPageTests(unittest.TestCase):
         self.assertRegex(index, r'<a class="editbtn" id="edit-cards" href="/admin"[^>]*rel="[^"]*nofollow')
         self.assertNotIn("password", index.lower().replace("a password is asked there", ""))   # no password box on the public page
 
-    def test_admin_page_has_no_secret_and_only_the_one_button(self):
-        text = self.read("site", "admin.html") + self.read("site", "admin.js")
+    def test_admin_page_has_no_secret_and_the_password_is_never_stored_in_the_page(self):
+        html, code = self.read("site", "admin.html"), self.read("site", "admin.js")
+        text = html + code
         for word in ("ADMIN_PASSWORD", "GITHUB_TOKEN", "ghp_", "github_pat_", "process.env", "localStorage",
                      "sessionStorage", "document.cookie"):
-            self.assertNotIn(word, text)
-        self.assertEqual(self.read("site", "admin.html").count("<button"), 1)   # the cards' Update buttons are added by admin.js
-        self.assertIn("Mastery review done", self.read("site", "admin.html"))
-        self.assertIn('type="password"', self.read("site", "admin.html"))
+            self.assertNotIn(word, text)                      # the login is an HttpOnly cookie; the page never touches it
+        self.assertIn("Mastery review done", html)
+        self.assertIn('type="password"', html)
+        self.assertEqual(html.count('type="password"'), 1)    # one password box, on the login screen
+        self.assertIn(">Log in<", html)
+        self.assertIn("Log out", html)
+        self.assertIn("Logged in", html)
+        self.assertIn('id="login-error"', html)               # a wrong password shows right there (red)
+        self.assertIn("Save all", html)
+        self.assertIn("Discard all", html)
+        self.assertIn('rel="stylesheet" href="style.css"', html)     # the site's own look
+        # the password goes only to the login helper, once, and is cleared from the box after a good login
+        self.assertEqual(code.count("password: $(\"password\").value"), 1)
+        self.assertIn('$("password").value = ""', code)
+        self.assertIn('credentials: "same-origin"', code)
+        self.assertIn('"X-Admin-Request": "1"', code)
 
     def test_the_helper_is_the_only_extra_published_code_and_reads_secrets_from_the_environment(self):
-        self.assertEqual(sorted(os.listdir(os.path.join(ROOT, "api"))), ["admin-card.js", "admin-review.js"])
+        self.assertEqual(sorted(os.listdir(os.path.join(ROOT, "api"))), ["admin-card.js", "admin-login.js", "admin-review.js"])
         self.assertIn("process.env", self.read("api", "admin-review.js"))
         self.assertIn("process.env", self.read("api", "admin-card.js"))
+        self.assertIn("process.env", self.read("api", "admin-login.js"))
+        self.assertIn("Set-Cookie", self.read("api", "admin-login.js"))
         logic = "".join(self.read("lib", n) for n in sorted(os.listdir(os.path.join(ROOT, "lib"))))
         self.assertNotRegex(logic, r"(ghp_|github_pat_)[A-Za-z0-9_]{10,}")
         self.assertIn("timingSafeEqual", logic)

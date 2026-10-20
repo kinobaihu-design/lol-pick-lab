@@ -8,7 +8,7 @@ module.exports = async function (req, res) {
     try { body = JSON.parse(body); } catch (e) { body = null; }
   }
   const out = await handle(
-    { method: req.method, body: body },
+    { method: req.method, body: body, headers: req.headers },
     process.env,
     { fetch: fetch, sleep: function (ms) { return new Promise(function (done) { setTimeout(done, ms); }); } }
   );

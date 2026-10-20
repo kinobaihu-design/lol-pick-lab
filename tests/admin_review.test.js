@@ -3,7 +3,8 @@ const test = require("node:test");
 const assert = require("node:assert");
 const A = require("../lib/admin-review.js");
 
-const ENV = { ADMIN_PASSWORD: "correct horse battery staple", GITHUB_TOKEN: "fake-token-for-tests" };
+const S = require("./admin_session.js");
+const ENV = S.ENV;
 
 function fakeWorld(options) {
   options = options || {};
@@ -26,35 +27,34 @@ function fakeWorld(options) {
     return reply(404, {});
   };
   world.sleep = async function (ms) { world.sleeps.push(ms); };
-  world.deps = { fetch: world.fetch, sleep: world.sleep };
+  world.deps = { fetch: world.fetch, sleep: world.sleep, now: () => S.NOW };
   return world;
 }
 
-const post = (password) => ({ method: "POST", body: { password: password } });
+const post = () => S.request("POST", {});
 const githubCalls = (w) => w.calls.filter((c) => c.url.indexOf("api.github.com") >= 0);
 
-test("wrong password: waits about 3 seconds, says so, and touches nothing", async () => {
+test("not logged in: 'Please log in', no waiting, touches nothing", async () => {
   const w = fakeWorld();
-  const out = await A.handle(post("nope"), ENV, w.deps);
-  assert.strictEqual(out.status, 401);
-  assert.strictEqual(out.body.message, "Wrong password");
-  assert.deepStrictEqual(w.sleeps, [3000]);
-  assert.strictEqual(w.calls.length, 0);
-});
-
-test("missing or empty password is refused like a wrong one", async () => {
-  for (const body of [null, {}, { password: "" }, { password: 5 }, { password: "x".repeat(500) }]) {
-    const w = fakeWorld();
-    const out = await A.handle({ method: "POST", body: body }, ENV, w.deps);
-    assert.strictEqual(out.body.message, "Wrong password");
-    assert.strictEqual(w.calls.length, 0);
+  for (const request of [
+    { method: "POST", body: {}, headers: { "x-admin-request": "1" } },                                   // no cookie
+    { method: "POST", body: {}, headers: { cookie: S.cookieFor() } },                                      // no request header
+    { method: "POST", body: {}, headers: { cookie: "admin_session=garbage", "x-admin-request": "1" } },
+    { method: "POST", body: { password: ENV.ADMIN_PASSWORD }, headers: {} },                               // the password alone is not a login
+    { method: "POST", body: {} }
+  ]) {
+    const out = await A.handle(request, ENV, w.deps);
+    assert.strictEqual(out.status, 401);
+    assert.strictEqual(out.body.message, "Please log in");
   }
+  assert.deepStrictEqual(w.sleeps, []);
+  assert.strictEqual(w.calls.length, 0);
 });
 
 test("secrets not set yet: 'Admin not set up yet', nothing called", async () => {
   for (const env of [{}, { ADMIN_PASSWORD: "x" }, { GITHUB_TOKEN: "x" }, { ADMIN_PASSWORD: "", GITHUB_TOKEN: "" }]) {
     const w = fakeWorld();
-    const out = await A.handle(post("x"), env, w.deps);
+    const out = await A.handle(post(), env, w.deps);
     assert.strictEqual(out.status, 503);
     assert.strictEqual(out.body.message, "Admin not set up yet");
     assert.strictEqual(w.calls.length, 0);
@@ -73,7 +73,7 @@ test("invalid current patch is refused and nothing is written", async () => {
     const w = fakeWorld({ patch: patch === undefined ? "__missing__" : patch });
     if (patch === undefined) w.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
     const deps = patch === undefined ? { fetch: w.fetch, sleep: w.sleep } : w.deps;
-    const out = await A.handle(post(ENV.ADMIN_PASSWORD), ENV, deps);
+    const out = await A.handle(post(), ENV, deps);
     assert.strictEqual(out.body.ok, false, String(patch));
     assert.strictEqual(githubCalls(w).length, 0, String(patch));
   }
@@ -81,20 +81,20 @@ test("invalid current patch is refused and nothing is written", async () => {
 
 test("data unreachable: 'Couldn't read the current patch, try later'", async () => {
   const w = fakeWorld({ dataDown: true });
-  const out = await A.handle(post(ENV.ADMIN_PASSWORD), ENV, w.deps);
+  const out = await A.handle(post(), ENV, w.deps);
   assert.strictEqual(out.body.message, "Couldn't read the current patch, try later");
   assert.strictEqual(githubCalls(w).length, 0);
 });
 
 test("the browser cannot choose the patch: extra fields are ignored", async () => {
   const w = fakeWorld({ patch: "16.21" });
-  const out = await A.handle({ method: "POST", body: { password: ENV.ADMIN_PASSWORD, patch: "99.99", files: ["x"] } }, ENV, w.deps);
+  const out = await A.handle(S.request("POST", { patch: "99.99", files: ["x"] }), ENV, w.deps);
   assert.strictEqual(out.body.patch, "16.21");
 });
 
 test("success: both files in ONE commit on main, right message, confirmation and link", async () => {
   const w = fakeWorld({ patch: "16.21" });
-  const out = await A.handle(post(ENV.ADMIN_PASSWORD), ENV, w.deps);
+  const out = await A.handle(post(), ENV, w.deps);
   assert.strictEqual(out.status, 200);
   assert.strictEqual(out.body.message, "Review set to patch 16.21 ✓");
   assert.strictEqual(out.body.commit_url, "https://github.com/kinobaihu-design/lol-pick-lab/commit/abc123");
@@ -132,20 +132,20 @@ test("only the two review files may be changed", async () => {
 
 test("GitHub key expired or invalid gives the clear message", async () => {
   const w = fakeWorld({ githubStatus: 401 });
-  const out = await A.handle(post(ENV.ADMIN_PASSWORD), ENV, w.deps);
+  const out = await A.handle(post(), ENV, w.deps);
   assert.strictEqual(out.body.message, "GitHub key expired or invalid: make a new one");
 });
 
 test("GitHub key without write permission says what to check", async () => {
   const w = fakeWorld({ githubStatus: 403 });
-  const out = await A.handle(post(ENV.ADMIN_PASSWORD), ENV, w.deps);
+  const out = await A.handle(post(), ENV, w.deps);
   assert.match(out.body.message, /Contents = Read and write/);
 });
 
 test("secrets never appear in an answer", async () => {
   for (const options of [{}, { githubStatus: 401 }, { dataDown: true }]) {
     const w = fakeWorld(options);
-    const text = JSON.stringify(await A.handle(post(ENV.ADMIN_PASSWORD), ENV, w.deps));
+    const text = JSON.stringify(await A.handle(post(), ENV, w.deps));
     assert.ok(text.indexOf(ENV.ADMIN_PASSWORD) < 0 && text.indexOf(ENV.GITHUB_TOKEN) < 0);
   }
 });

@@ -7,37 +7,112 @@
 <title>Admin</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  .admin-card { border: 1px solid #8884; border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
-  .admin-card h3 { margin: 0 0 6px; font-size: 1rem; }
-  .admin-card h3 small { font-weight: normal; opacity: .7; }
-  .admin-fields { display: flex; flex-wrap: wrap; gap: 8px 14px; }
-  .admin-fields label { display: flex; flex-direction: column; font-size: .8rem; }
-  .admin-fields select { font-size: .9rem; }
-  .admin-preview { margin: 8px 0 4px; font-size: .9rem; min-height: 1.2em; }
-  .admin-result { font-size: .9rem; margin: 4px 0 0; }
-  .admin-changed select.changed { outline: 2px solid #e0a000; }
+  [hidden] { display: none !important; }
+  .adminhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+  .adminhead h1 { margin: 0; }
+  .sessionbar { display: flex; align-items: center; gap: 10px; }
+  .okchip { padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; color: var(--up);
+    border: 1px solid var(--up); }
+  .btn { font: inherit; font-size: 14px; font-weight: 600; padding: 7px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .btn:hover:not(:disabled) { border-color: var(--muted); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.primary { background: var(--B); border-color: var(--B); color: #fff; }
+  .btn.small { padding: 3px 10px; font-size: 12px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 0 0 16px; }
+  .loginbox { max-width: 380px; margin: 40px auto; }
+  .loginbox h2 { margin: 0 0 12px; font-size: 20px; }
+  .loginbox label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .loginbox input[type=password] { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 10px 12px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .loginbox .btn { width: 100%; margin-top: 12px; padding: 10px 16px; font-size: 16px; }
+  .adminerror { color: var(--down); font-weight: 600; font-size: 14px; margin: 10px 0 0; min-height: 1.2em; }
+  .adminerror.ok { color: var(--up); }
+  .adminbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; }
+  .status { font-size: 14px; }
+  .changesbox { border-color: #e0a000; }
+  .changesbox h2 { margin: 0 0 8px; font-size: 16px; }
+  .changegroup { margin: 8px 0; }
+  .changegroup > b { font-size: 15px; }
+  .changegroup .comfortline { font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .changegroup ul { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
+  .changegroup li { margin: 2px 0; }
+  .undo { all: unset; cursor: pointer; margin-left: 8px; color: var(--muted); font-weight: 700; }
+  .undo:hover { color: var(--down); }
+  .changeactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+  .searchrow { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; }
+  .searchrow input { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); min-width: 220px; }
+  #cards-table { min-width: 620px; }
+  #cards-table select { font: inherit; font-size: 14px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); }
+  #cards-table select.changed { outline: 2px solid #e0a000; }
+  #cards-table tr.rowchanged > td { background: color-mix(in srgb, #e0a000 9%, var(--card)); }
+  #cards-table td.champ small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
+  .traitsbtn { all: unset; cursor: pointer; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+  .traitsbtn:focus-visible { outline: 2px solid var(--B); border-radius: 6px; }
+  .traitsbtn .trait { padding: 0 6px; font-size: 11px; }
+  .traitsbtn .more { font-size: 11px; color: var(--muted); margin-left: 4px; }
+  .traitgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 12px; padding: 6px 0; }
+  .traitgrid label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 3px; }
+  .comfortnow { font-weight: 700; }
+  .comfortchange { color: var(--muted); font-weight: 400; }
+  .comfortchange b { color: var(--text); }
 </style>
 </head>
 <body>
 <main>
-  <header><h1>Admin</h1></header>
-  <p>Type the password, then press a button. The password is asked for every time and is never saved: the box
-  empties after each action.</p>
-  <p><label for="admin-password">Password</label><br>
-  <input type="password" id="admin-password" autocomplete="current-password"></p>
+  <header class="adminhead">
+    <h1>Admin</h1>
+    <div class="sessionbar" id="session" hidden>
+      <span class="okchip">Logged in</span>
+      <button type="button" class="btn small" id="logout">Log out</button>
+    </div>
+  </header>
 
-  <h2>Mastery review</h2>
-  <form id="admin-form" autocomplete="off">
-    <p><button type="submit" id="admin-review-done">Mastery review done</button></p>
-    <p id="admin-status" role="status"></p>
-  </form>
+  <section class="panel loginbox" id="login-view" hidden>
+    <h2>Log in</h2>
+    <form id="login-form" autocomplete="on">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <button type="submit" class="btn primary" id="login-button">Log in</button>
+      <p class="adminerror" id="login-error" role="alert"></p>
+    </form>
+  </section>
 
-  <h2>Champion cards</h2>
-  <p>Change a champion's mastery or its traits, check the preview, then press Update. Each change is saved as its
-  own commit on GitHub (that list is the edit history), and the scores are recalculated within a few minutes.
-  Editing a card never resets the mastery review reminder.</p>
-  <p id="admin-cards-status" role="status">Loading the cards&hellip;</p>
-  <div id="admin-cards"></div>
+  <div id="editor-view" hidden>
+    <div class="adminbar">
+      <button type="button" class="btn" id="review-done">Mastery review done</button>
+      <span class="status" id="review-status" role="status"></span>
+    </div>
+
+    <section class="panel changesbox" id="changes-box" hidden>
+      <h2 id="changes-title">Unsaved changes</h2>
+      <div id="changes-list"></div>
+      <p class="status" id="changes-trait-line"></p>
+      <div class="changeactions">
+        <button type="button" class="btn primary" id="save-all">Save all</button>
+        <button type="button" class="btn" id="discard-all">Discard all</button>
+        <button type="button" class="btn" id="reload-cards" hidden>Reload cards (drops your changes)</button>
+      </div>
+    </section>
+    <p class="status" id="save-status" role="status"></p>
+
+    <div class="searchrow">
+      <input type="search" id="search" placeholder="Find a champion&hellip;" aria-label="Find a champion" autocomplete="off">
+      <span class="status" id="cards-count"></span>
+    </div>
+    <div class="tablewrap">
+      <table id="cards-table">
+        <thead>
+          <tr><th>Champion</th><th>Mastery</th><th>Traits (tap to edit)</th><th class="num">Comfort</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="intro">Change a mastery in its row, or tap the traits to change them. Edit as many champions as you like, then
+    press Save all: it makes one commit and one rescore. Editing a card never resets the mastery review reminder.</p>
+  </div>
 </main>
 <script src="settings.js"></script>
 <script src="comfort-preview.js"></script>

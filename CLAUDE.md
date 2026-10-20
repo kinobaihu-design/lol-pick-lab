@@ -218,6 +218,18 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
 
+## Brief changes v1.5 (no change to the Pick Score), Oct 20, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Admin page redesign** (planned and approved Oct 20). Supersedes the "password typed for every action" rule of v0.43.
+  - **Login:** one screen with a Password box and a Log in button; a wrong password shows a red message right there (and the helper still waits 3 seconds). After login the page shows "Logged in" and a Log out button. The login is a **30-day cookie**: `POST /api/admin-login` checks the password and sets `admin_session` (a signed token with an expiry, `HttpOnly; Secure; SameSite=Strict; Path=/api`). The signing key is made from `ADMIN_PASSWORD`, so changing that Vercel secret logs every device out. The password is never stored in the page. Every other helper needs the cookie plus the `X-Admin-Request: 1` header. Code: `lib/admin-common.js` (token and cookie helpers, `checkAccess`), `lib/admin-login.js`, `api/admin-login.js` (GET = status, POST = login, DELETE = log out).
+  - **One table with all cards** in the site's own look (`style.css`, dark and light): mastery dropdown in the row, traits as badges (tap to open the 8 trait dropdowns), Comfort now (or now → after). A search box finds a champion.
+  - **Save all = one commit and one rescore.** Pending edits show in an "Unsaved changes" box (grouped by champion, Comfort before → after, a ✕ to undo each, the trait-average line), with Save all and Discard all. `POST /api/admin-card` takes `{changes: [{champion, field, from, value}, ...]}` (1 to 100; the same allowed values; no two changes to the same field; every `from` must still match the file or the whole batch is refused with the "someone else changed the cards" message; the result is checked to be the old data plus exactly those changes). One change gives "Card edit: Jinx mastery Good → Main"; more give "Card edits: …" with every change in the commit body. After saving the page says "Scores update in about 3 minutes" with the commit link. Leaving with unsaved changes asks first.
+  - Comfort preview: `previewBatch` in `site/comfort-preview.js` (a copy of the scoring maths; tests compare it with the Python code for several batches). "Mastery review done" stays (now uses the cookie).
+  - No rate-limit database (owner's decision); the owner sets a long generated `ADMIN_PASSWORD` in Vercel after this went live. Skipped: a live rescore-status indicator.
+- Tests: `tests/admin_login.test.js`, `tests/admin_cards.test.js`, `tests/admin_review.test.js` (fake GitHub, `tests/admin_session.js` builds logged-in requests), `tests/test_vercel.py`, `tests/test_admin_cards.py`.
+
 ## Brief changes v1.4 (no change to the Pick Score), Oct 20, 2026
 
 Pasted from the owner; the live brief has the full details.
@@ -516,6 +528,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v1.5** (Oct 20, 2026): no score change. Admin page redesign: login screen with a 30-day cookie, one table of all cards, Save all (one commit, one rescore), search, Discard all.
 - **v1.4** (Oct 20, 2026): no score change. Top upgrades and Next step to A or S removed; the Utopy table gets its new look (ring, up arrows, labels, legend).
 - **v1.3** (Oct 20, 2026): no score change. Utopy table "if I mained everyone" replaces the Utopy picks list on the Growth tab.
 - **v1.2** (Oct 19, 2026): no score change. Run summary shows peak memory, the runner's memory and the season player count, with a 60% warning.

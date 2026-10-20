@@ -100,6 +100,34 @@ class PreviewMatchesTheScoringCodeTests(unittest.TestCase):
         self.assertEqual(comfort.comfort(with_change(next(c for c in self.cards if c["name"] == "Hwei"), "cc", "high"), 5.0)["kit_adjustment"], 5.0)
         self.assertGreater(len(results), 5)
 
+    def test_batch_preview_matches_the_scoring_code(self):
+        """Several pending changes at once (Save all): trait average and every changed champion's Comfort."""
+        batches = [
+            [{"champion": "Jinx", "field": "mastery", "value": "main"}],
+            [{"champion": "Jinx", "field": "mastery", "value": "main"}, {"champion": "Sivir", "field": "aoe", "value": "mid"},
+             {"champion": "Sivir", "field": "cc", "value": "low"}, {"champion": "Hwei", "field": "wave_clear", "value": "none"}],
+            [{"champion": "Vayne", "field": t, "value": "none"} for t in TRAITS],
+            [{"champion": "Hwei", "field": t, "value": "high"} for t in TRAITS] + [{"champion": "Ashe", "field": "mastery", "value": "never_played"}],
+            [{"champion": "Varus", "field": "mastery", "value": "main"}],
+        ]
+        for ranked in (self.ranked, [], ["Jinx", "Sivir"]):
+            got = node({"mode": "batch", "cards": self.cards, "ranked": ranked, "batches": batches})
+            for batch, result in zip(batches, got):
+                after = [dict(c) for c in self.cards]
+                for change in batch:
+                    index = next(i for i, c in enumerate(after) if c["name"] == change["champion"])
+                    after[index] = with_change(after[index], change["field"], change["value"])
+                before_avg, after_avg = python_average(self.cards, ranked), python_average(after, ranked)
+                self.assertAlmostEqual(result["traitAverageBefore"], before_avg, places=9)
+                self.assertAlmostEqual(result["traitAverageAfter"], after_avg, places=9)
+                names = {c["champion"] for c in batch}
+                self.assertEqual(set(result["byChampion"]), names)
+                for name in names:
+                    old = next(c for c in self.cards if c["name"] == name)
+                    new = next(c for c in after if c["name"] == name)
+                    self.assertAlmostEqual(result["byChampion"][name]["before"], comfort.comfort(old, before_avg)["comfort"], places=9)
+                    self.assertAlmostEqual(result["byChampion"][name]["after"], comfort.comfort(new, after_avg)["comfort"], places=9)
+
     def test_with_few_ranked_champions_the_average_of_all_cards_is_used(self):
         scenarios = [{"name": "Jinx", "changes": [{"field": "cc", "value": "none"}]}]
         for ranked in ([], ["Jinx", "Sivir"], [c["riot_name"] for c in self.cards[:9]]):
@@ -123,15 +151,21 @@ class PreviewMatchesTheScoringCodeTests(unittest.TestCase):
             self.assertAlmostEqual(got["traitAverageAfter"], python_average(after_cards, ranked), places=9, msg=label)
         return js
 
-    def test_the_page_uses_the_preview_and_the_text_asked_for(self):
+    def test_the_page_uses_the_preview_and_shows_what_changed(self):
         page = read("site", "admin.js")
         self.assertIn("ComfortPreview", page)
-        self.assertRegex(page, r'"Comfort " \+ fmt\(p\.comfortBefore, 1\) \+ " (\\u2192|\u2192) " \+ fmt\(p\.comfortAfter, 1\)')
-        self.assertIn("trait average", page)
-        self.assertIn("all cards move slightly", page)
+        self.assertIn("previewBatch", page)
+        self.assertIn("Comfort ", page)
+        self.assertIn("Trait average", page)
+        self.assertIn("every card's Comfort moves slightly", page)
         html = read("site", "admin.html")
         self.assertLess(html.index("settings.js"), html.index("comfort-preview.js"))
         self.assertLess(html.index("comfort-preview.js"), html.index("admin.js"))
+        self.assertIn("Unsaved changes", html)
+        self.assertIn("Find a champion", html)
+        for text in ("Scores update in about 3 minutes", "See the commit on GitHub", "beforeunload"):
+            self.assertIn(text, page)
+        self.assertIn('"/api/admin-card", "POST", { changes:', page)          # Save all = one request, one commit
 
 
 @unittest.skipUnless(NODE, "Node is not installed")
