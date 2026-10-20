@@ -93,13 +93,5 @@ TIER_BOUNDARIES = [("S", 1.5), ("A", 0.5), ("B", -0.5), ("C", -1.5)]
 # gets a warning sign next to it on the page.
 WIN_RATE_WARNING_DELTA = -1.5
 
-# ---- Growth advisor ----
-# Only champions with a card (Comfort needs one). Both lists (Top upgrades and Next step to A or S) use the
-# NEXT mastery level only (v0.39): Never played -> Below average -> Average -> Good -> Main. Main has no next level.
-# "Ceiling at Main" is shown as information only and never decides who appears in either list.
-GROWTH_TARGET = {"never_played": "below_average", "below_average": "average", "average": "good", "good": "main"}
-# Compared with the owner's current #3 pick.
-GROWTH_BEAT_RANK = 3
-
 # The role this model scores. Roles in the data files: BOTTOM covers ADCs and APCs.
 LANE_ROLE = "BOTTOM"

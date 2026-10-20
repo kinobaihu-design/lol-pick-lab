@@ -127,9 +127,25 @@ td.traitcell { white-space: normal; min-width: 240px; max-width: 340px; }
 .sitefooter p { margin: 0 0 6px; max-width: 900px; }
 .sitefooter .about { font-size: 11px; }
 
-/* Utopy table (v1.3) */
-.utopy-cell .tier { min-width: 3.2em; display: inline-block; text-align: center; }
-.utopy-now .tier { outline: 2px solid currentColor; outline-offset: 2px; font-weight: 700; }
-.utopy-grey { color: var(--muted); background: transparent; }
-.utopy-grey td { color: var(--muted); }
+/* Utopy table (v1.3, v1.4) */
 #utopy-wrap { overflow-x: auto; }
+#utopy-table { table-layout: fixed; min-width: 760px; }
+#utopy-table .u-champ { width: 215px; }
+#utopy-table .u-score { width: 76px; text-align: center; }
+#utopy-table .u-skill { width: 250px; }
+.utopy-cell { position: relative; text-align: center; padding-left: 4px; padding-right: 4px; }
+.utopy-cell .tier { min-width: 3.4em; display: inline-block; text-align: center; }
+/* Your level now: a two-tone ring (dark inside, white outside) that shows on every tier color. */
+.utopy-now { box-shadow: 0 0 0 2px #14161a, 0 0 0 4px #ffffff; font-weight: 800; }
+.utopy-up { position: absolute; top: 2px; right: 3px; font-size: 13px; font-weight: 800; color: var(--up); cursor: help; line-height: 1; }
+.utopy-meta { display: block; white-space: normal; font-size: 11px; line-height: 1.7; }
+.utopy-meta .chip { margin-top: 0; }
+.skill-pos { color: var(--up); } .skill-neg { color: var(--down); }
+.skill-rest { font-size: 11px; color: var(--muted); font-weight: 400; }
+.utopy-grey, .utopy-grey td { color: var(--muted); background: transparent; }
+.legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; font-size: 12px; color: var(--muted); }
+.legend .tier { min-width: 28px; padding: 1px 8px; cursor: help; }
+.legendtitle { margin-right: 2px; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+.legendnote { margin-left: 12px; }
+.utopy-mark { display: inline-block; padding: 0 6px; border-radius: 4px; background: var(--line); color: var(--text); box-shadow: 0 0 0 1px #14161a, 0 0 0 2px #fff; font-weight: 700; }
+.legendnote .utopy-up { position: static; display: inline; margin-right: 2px; }

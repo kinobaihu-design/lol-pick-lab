@@ -205,22 +205,14 @@
       Math.round(champ.otp_games).toLocaleString("en-US") + " games";
   }
 
-  // Growth tip: one plain sentence. `list` is the Pick Score list (to find the champion's OTP numbers).
-  function growthTipText(tip) {
-    var now = masteryText(tip.current_mastery), target = masteryText(tip.target_mastery);
-    var from = number(tip.pick_score_now, 1), to = number(tip.pick_score_at_target, 1);
-    if (tip.kind === "New champion") {
-      return "You've never played " + tip.name + ", but at " + target + " it would rank #" + tip.would_rank +
-        " this patch (" + from + " \u2192 " + to + ", " + tip.tier_at_target + " tier); worth starting.";
-    }
-    return "You're " + now + " with " + tip.name + "; at " + target + " it would go from " + from + " to " + to +
-      " (" + tip.tier_at_target + " tier, #" + tip.would_rank + ").";
-  }
-
-  // "Kalista: 71.0 \u2192 79.0 if Good"
-  function growthHeadline(tip) {
-    return tip.name + ": " + number(tip.pick_score_now, 1) + " \u2192 " + number(tip.pick_score_at_target, 1) +
-      " if " + masteryText(tip.target_mastery);
+  // The skill line in two parts for the Utopy table: the bold OTP percent ("OTP +4.6%") and the quiet rest
+  // ("12 OTPs · 340 games"). null below the minimum bot-lane OTP games.
+  function skillParts(champ, minGames) {
+    var d = skillDelta(champ, minGames);
+    if (d === null) return null;
+    var players = champ.otp_players || 0;
+    return { delta: d, percent: "OTP " + signed(d, 1) + "%",
+      rest: players + (players === 1 ? " OTP" : " OTPs") + " \u00b7 " + Math.round(champ.otp_games).toLocaleString("en-US") + " games" };
   }
 
   // ---- v0.38 ----
@@ -296,17 +288,6 @@
     return "Patch " + patch + " \u00b7 most champions " + mix.low + "\u2013" + mix.high + "% this patch";
   }
 
-  // The quiet extra on Growth rows: "at Main: S" (the ceiling; information only, never decides who is listed).
-  function ceilingText(champ) {
-    return champ && champ.best_tier_at_main ? "at Main: " + champ.best_tier_at_main : "";
-  }
-
-  // The one line shown when "Next step to A or S" is empty.
-  function closestText(closest) {
-    if (!closest) return "None this patch";
-    return "None this patch \u00b7 closest: " + closest.name + ", " + number(closest.points_short, 1) + " points short";
-  }
-
   // ---- Utopy table (v1.3): "if I mained everyone" ----
   // The compact skill line, or "too few games" (below the minimum bot-lane OTP games).
   function utopySkillText(champ, minGames) {
@@ -379,17 +360,6 @@
     flex:     { first: "desc", value: function (c) { return c.comfort_parts.flexibility_bonus; } }
   };
 
-  var GROWTH_COLUMNS = {
-    g_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
-    g_kind:   { first: "asc", value: function (t) { return t.kind; } },
-    g_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
-    g_score:  { first: "desc", value: function (t) { return t.pick_score_at_target; } },
-    g_gain:   { first: "desc", value: function (t) { return t.gain; } },
-    g_rank:   { first: "asc", value: function (t) { return t.would_rank; } },
-    g_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_at_target); } },
-    g_ceiling: { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.ceiling); } },
-    g_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
-  };
 
   // Pick Score at a mastery level, or null for a grey row (no score). Null always sorts last.
   function utopyScore(t, level) { return t.unranked || !t.scores ? null : t.scores[level].score; }
@@ -402,15 +372,6 @@
     u_good:   { first: "desc", value: function (t) { return utopyScore(t, "good"); } },
     u_main:   { first: "desc", value: function (t) { return utopyScore(t, "main"); } },
     u_skill:  { first: "desc", value: function (t) { return t.unranked ? null : t.skill_delta; } }
-  };
-  var NEXT_COLUMNS = {
-    n_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
-    n_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
-    n_tier:   { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.tier_next); } },
-    n_score:  { first: "desc", value: function (t) { return t.pick_score_next; } },
-    n_gain:   { first: "desc", value: function (t) { return t.gain; } },
-    n_ceiling: { first: "desc", value: function (t) { return TIER_ORDER.indexOf(t.ceiling); } },
-    n_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
   };
 
   function firstDirection(key, columns) {
@@ -469,15 +430,15 @@
               masteryText: masteryText, masteryLevel: masteryLevel, traitList: traitList, sampleLabel: sampleLabel, dataLabel: dataLabel,
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
               sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS,
-              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, NEXT_COLUMNS: NEXT_COLUMNS, UTOPY_COLUMNS: UTOPY_COLUMNS,
+              META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, UTOPY_COLUMNS: UTOPY_COLUMNS,
               utopySkillText: utopySkillText, utopyReason: utopyReason, utopyUnrankedNumbers: utopyUnrankedNumbers,
               normalise: normalise, cardInfo: cardInfo, applyCards: applyCards, meanAndSpread: meanAndSpread,
               spreadStep: spreadStep, stepClass: stepClass, patchMix: patchMix, patchMixText: patchMixText,
-              bestReachText: bestReachText, ceilingText: ceilingText, closestText: closestText,
+              bestReachText: bestReachText,
               typeText: typeText, mainTypeText: mainTypeText, secondaryTypeText: secondaryTypeText,
               difficultyText: difficultyText, masteryPointsText: masteryPointsText, flexText: flexText,
               needsCard: needsCard, otpWinRateText: otpWinRateText, skillDelta: skillDelta,
-              skillPaysOffText: skillPaysOffText, growthTipText: growthTipText, growthHeadline: growthHeadline,
+              skillPaysOffText: skillPaysOffText, skillParts: skillParts,
               parsePatch: parsePatch, masteryReview: masteryReview };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Format = api;

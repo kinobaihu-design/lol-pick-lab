@@ -129,64 +129,25 @@
     </section>
 
     <section id="tab-growth" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-growth" hidden>
-      <p class="intro">Ideas for getting better at champions with a card. They are advice only and never change any score.</p>
-      <h2 class="sectionhead" data-tip-key="top_upgrades">Top upgrades</h2>
-      <p class="intro">Champions that would beat your current #3 pick one mastery step up (Never played &rarr; Below average &rarr; Average &rarr; Good &rarr; Main).</p>
-      <div class="tablewrap" id="growth-wrap">
-        <table id="growth-table">
-          <thead>
-            <tr>
-              <th data-sort="g_champion">Champion</th>
-              <th data-sort="g_kind">Advice</th>
-              <th data-sort="g_mastery">Mastery now</th>
-              <th class="num" data-sort="g_score">Pick Score</th>
-              <th class="num" data-sort="g_gain">Gain</th>
-              <th class="num" data-sort="g_rank">Would rank</th>
-              <th data-sort="g_tier">Tier</th>
-              <th class="detail-col" data-sort="g_ceiling">Ceiling</th>
-              <th data-sort="g_skill">Skill pays off?</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p id="growth-empty" class="intro" hidden>No top upgrades right now: nothing you could learn or improve would beat your current #3 pick.</p>
-
-      <h2 class="sectionhead" data-tip-key="next_step">Next step to A or S</h2>
-      <p class="intro">Champions now in B, C or D that would land in A or S with just one mastery step up.</p>
-      <div class="tablewrap" id="next-wrap">
-        <table id="next-table">
-          <thead>
-            <tr>
-              <th data-sort="n_champion">Champion</th>
-              <th data-sort="n_mastery">Mastery now &rarr; next</th>
-              <th data-sort="n_tier">Tier now &rarr; next</th>
-              <th class="num" data-sort="n_score">Pick Score</th>
-              <th class="num" data-sort="n_gain">Gain</th>
-              <th class="detail-col" data-sort="n_ceiling">Ceiling</th>
-              <th data-sort="n_skill">Skill pays off?</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p id="next-empty" class="intro" hidden></p>
-      <p id="next-old" class="notice warn" hidden>This scores file is from before this list existed; it appears after the next collector run.</p>
-
       <section class="utopy">
         <h2 class="sectionhead" data-tip-key="utopy">Utopy table: if I mained everyone</h2>
         <p class="intro">What each champion's Pick Score would be at every mastery level, by this model. Information only</p>
+        <p class="legend" id="utopy-legend">
+          <span class="legendtitle">Tier</span>
+          <span class="tier tier-S" data-tip-key="tier_S">S</span><span class="tier tier-A" data-tip-key="tier_A">A</span><span class="tier tier-B" data-tip-key="tier_B">B</span><span class="tier tier-C" data-tip-key="tier_C">C</span><span class="tier tier-D" data-tip-key="tier_D">D</span>
+          <span class="legendnote"><span class="utopy-mark">now</span> your level now &nbsp; <span class="utopy-up">&uarr;</span> beats your #3 pick</span>
+        </p>
         <div class="tablewrap" id="utopy-wrap">
           <table id="utopy-table">
             <thead>
               <tr>
-                <th data-sort="u_champion">Champion</th>
-                <th class="num" data-sort="u_never_played">Never played</th>
-                <th class="num" data-sort="u_below_average">Below average</th>
-                <th class="num" data-sort="u_average">Average</th>
-                <th class="num" data-sort="u_good">Good</th>
-                <th class="num" data-sort="u_main">Main</th>
-                <th data-sort="u_skill">Skill pays off?</th>
+                <th class="u-champ" data-sort="u_champion">Champion</th>
+                <th class="num u-score" data-sort="u_never_played">Never</th>
+                <th class="num u-score" data-sort="u_below_average">Below avg</th>
+                <th class="num u-score" data-sort="u_average">Avg</th>
+                <th class="num u-score" data-sort="u_good">Good</th>
+                <th class="num u-score" data-sort="u_main">Main</th>
+                <th class="u-skill" data-sort="u_skill">Skill pays off?</th>
               </tr>
             </thead>
             <tbody></tbody>

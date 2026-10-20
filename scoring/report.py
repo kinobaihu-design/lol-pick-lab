@@ -48,16 +48,6 @@ def results_text(res):
          for c in res["pick_score_list"]]))
     out.append("(! = win rate 1.5% or more below the Diamond+ average; display only, no effect on the tier)")
 
-    out.append("\n## Growth advisor (champions with a card)")
-    if res["growth_advisor"]:
-        out.append(table(
-            ["Champion", "Kind", "Now", "At target", "Would rank", "Tier"],
-            [(a["name"], a["kind"], "%s: %.1f" % (a["current_mastery"], a["pick_score_now"]),
-              "%.1f if %s" % (a["pick_score_at_target"], a["target_mastery"]), "#%d" % a["would_rank"],
-              a["tier_at_target"]) for a in res["growth_advisor"]]))
-    else:
-        out.append("No suggestions: nothing would beat your current #3 pick.")
-
     out.append("\n## Needs a card (pass the filters, no card yet, by Meta Score)")
     if res["needs_a_card"]:
         out.append(table(

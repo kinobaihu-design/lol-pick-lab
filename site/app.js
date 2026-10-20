@@ -363,66 +363,59 @@
     body.appendChild(tr);
   }
 
-  // ---- Growth tab ----
-  function growthRows(t, body) {
-    var tr = el("tr");
-    var name = el("td", "champ", t.name);
-    name.appendChild(el("span", "sub tipline", F.growthTipText(t)));
-    tr.appendChild(name);
-    var kind = el("td");
-    kind.appendChild(el("span", "kind kind-" + (t.kind === "New champion" ? "new" : "up"), t.kind));
-    tr.appendChild(kind);
-    cell(tr, F.masteryText(t.current_mastery) + " \u2192 " + F.masteryText(t.target_mastery));
-    cell(tr, F.number(t.pick_score_now, 1) + " \u2192 " + F.number(t.pick_score_at_target, 1), "num");
-    cell(tr, "+" + F.number(t.gain, 1), "num up");
-    cell(tr, "#" + t.would_rank, "num");
-    var tierCell = el("td");
-    tierCell.appendChild(tierBadge(t.tier_at_target));
-    tr.appendChild(tierCell);
-    cell(tr, F.ceilingText(state.byId[t.id]), "detail-col");
-    var skill = F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
-    cell(tr, skill, "skill");
-    body.appendChild(tr);
-  }
-
+  // ---- Growth tab: the Utopy table ----
   var UTOPY_LEVELS = ["never_played", "below_average", "average", "good", "main"];
+
+  // The small line under a champion's name: sample size (Low / Medium / High) and the data-freshness chip,
+  // the same words and look as on the Tier list.
+  function utopyMeta(c) {
+    var line = el("span", "sub utopy-meta");
+    var sample = F.sampleLabel(c.real_games, S.SAMPLE_SIZE_LIMITS);
+    line.appendChild(el("span", "sample-" + sample.split(" ")[0], sample + " sample"));
+    var chip = dataChip(c);
+    if (chip) { line.appendChild(document.createTextNode(" ")); line.appendChild(chip); }
+    return line;
+  }
 
   function utopyRows(t, body) {
     var tr = el("tr");
     if (t.unranked) {
       tr.className = "utopy-grey";
-      var name = cell(tr, t.name, "champ");
-      name.appendChild(el("span", "sub", F.utopyReason(t.failed) + " \u00b7 " + F.utopyUnrankedNumbers(t)));
+      var name = cell(tr, t.name, "champ u-champ");
+      var sample = F.sampleLabel(t.real_games, S.SAMPLE_SIZE_LIMITS);
+      name.appendChild(el("span", "sub", sample + " sample \u00b7 " + F.utopyReason(t.failed) + " \u00b7 " + F.utopyUnrankedNumbers(t)));
       var span = cell(tr, "no score this patch");
       span.colSpan = UTOPY_LEVELS.length + 1;
       body.appendChild(tr);
       return;
     }
-    cell(tr, t.name, "champ");
-    UTOPY_LEVELS.forEach(function (level) {
-      var td = el("td", "num utopy-cell" + (level === t.current_mastery ? " utopy-now" : ""));
+    var ranked = state.byId[t.id] || {};
+    var nameCell = cell(tr, t.name, "champ u-champ");
+    nameCell.appendChild(utopyMeta(ranked));
+    var here = UTOPY_LEVELS.indexOf(t.current_mastery);
+    UTOPY_LEVELS.forEach(function (level, i) {
+      var td = el("td", "num utopy-cell");
       var s = t.scores[level];
-      td.appendChild(el("span", "tier tier-" + s.tier, F.number(s.score, 1)));
-      if (level === t.current_mastery) td.setAttribute("data-tip", "Your mastery now");
+      var pill = el("span", "tier tier-" + s.tier + (level === t.current_mastery ? " utopy-now" : ""), F.number(s.score, 1));
+      if (level === t.current_mastery) pill.setAttribute("data-tip", "Your mastery now");
+      td.appendChild(pill);
+      // Only levels above yours count: a score that would beat your current #3 pick.
+      if (i > here && state.third && s.score > state.third.score) {
+        var up = el("span", "utopy-up", "\u2191");
+        up.setAttribute("data-tip", "Would beat your current #3 pick (" + state.third.name + ", " + F.number(state.third.score, 1) + ")");
+        td.appendChild(up);
+      }
       tr.appendChild(td);
     });
-    cell(tr, F.utopySkillText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN), "skill");
-    body.appendChild(tr);
-  }
-
-  function nextRows(t, body) {
-    var tr = el("tr");
-    cell(tr, t.name, "champ");
-    cell(tr, F.masteryText(t.current_mastery) + " \u2192 " + F.masteryText(t.next_mastery));
-    var tierCell = el("td");
-    tierCell.appendChild(tierBadge(t.tier_now));
-    tierCell.appendChild(document.createTextNode(" \u2192 "));
-    tierCell.appendChild(tierBadge(t.tier_next));
-    tr.appendChild(tierCell);
-    cell(tr, F.number(t.pick_score_now, 1) + " \u2192 " + F.number(t.pick_score_next, 1), "num");
-    cell(tr, "+" + F.number(t.gain, 1), "num up");
-    cell(tr, F.ceilingText(state.byId[t.id]), "detail-col");
-    cell(tr, F.skillPaysOffText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN), "skill");
+    var skill = el("td", "skill u-skill");
+    var parts = F.skillParts(ranked, S.OTP_MIN_GAMES_SHOWN);
+    if (parts) {
+      skill.appendChild(el("b", parts.delta > 0 ? "skill-pos" : parts.delta < 0 ? "skill-neg" : "", parts.percent));
+      skill.appendChild(el("span", "skill-rest", " \u00b7 " + parts.rest));
+    } else {
+      skill.appendChild(el("span", "skill-rest", "too few games"));
+    }
+    tr.appendChild(skill);
     body.appendChild(tr);
   }
 
@@ -510,36 +503,9 @@
     tables.comfort.list = picks.filter(function (c) { return c.comfort_parts; });
     tables.comfort.draw();
 
-    var tips = (data.growth_advisor || []).map(function (t) {
-      var copy = {};
-      Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
-      copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
-      copy.ceiling = (state.byId[t.id] || {}).best_tier_at_main;
-      return copy;
-    });
-    tables.growth = sortableTable("growth-table", F.GROWTH_COLUMNS, "g_score", function (t) { return t.pick_score_at_target; }, growthRows);
-    tables.growth.list = tips;
-    tables.growth.draw();
-    document.getElementById("growth-wrap").hidden = tips.length === 0;
-    document.getElementById("growth-empty").hidden = tips.length !== 0;
-
-    var hasNext = Array.isArray(data.next_step_list);
-    var next = (data.next_step_list || []).map(function (t) {
-      var copy = {};
-      Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
-      copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
-      copy.ceiling = t.tier_at_main;
-      return copy;
-    });
-    tables.next = sortableTable("next-table", F.NEXT_COLUMNS, "n_score", function (t) { return t.pick_score_next; }, nextRows);
-    tables.next.list = next;
-    tables.next.draw();
-    document.getElementById("next-wrap").hidden = next.length === 0;
-    var emptyLine = document.getElementById("next-empty");
-    emptyLine.textContent = F.closestText(data.next_step_closest);
-    emptyLine.hidden = !hasNext || next.length !== 0;
-    document.getElementById("next-old").hidden = hasNext;
-
+    // Your current #3 pick: a score above it earns the small up arrow in the Utopy table.
+    var byScore = picks.slice().sort(function (a, b) { return b.pick_score - a.pick_score; });
+    state.third = byScore.length >= 3 ? { score: byScore[2].pick_score, name: byScore[2].name } : null;
     var hasUtopy = Array.isArray(data.utopy_table);
     var utopy = (data.utopy_table || []).map(function (t) {
       var copy = {};

@@ -17,7 +17,7 @@
     tab_tier: "Your Pick Score ranking: data (42.5%), your Comfort (52.5%) and one-tricks (5%) together. Only champions with a card.",
     tab_meta: "The data-only ranking (Meta Score): every champion that passes the filters, with or without a card.",
     tab_comfort: "How each Comfort number is built from the card. View only.",
-    tab_growth: "Tips on which champions to learn or improve, because they would beat your current #3 pick.",
+    tab_growth: "The Utopy table: every carded champion's Pick Score at each of the 5 mastery levels, to see which champions are worth learning.",
 
     // ---- Meta tab ----
     meta_rank: "Place by Meta Score (1 = strongest on data alone). It keeps its number when you sort by another column.",
@@ -46,34 +46,20 @@
     flex: "Beta bonus for champions that can be built two ways (Varus only): +1 × the mastery's flexibility factor.",
 
     // ---- Growth tab ----
-    g_champion: "A champion with a card that is not yet a Main.",
-    g_kind: "Upgrade = you already play it and could get better. New champion = you have never played it.",
-    g_mastery: "Your mastery now. The target is always the next level: Never played → Below average → Average → Good → Main.",
-    g_score: "Pick Score now → Pick Score at the next mastery level. A tip appears only when the new score beats your current #3 pick.",
-    g_gain: "How many Pick Score points the champion would gain one mastery step up.",
-    g_rank: "Where it would rank in the tier list one mastery step up.",
-    g_tier: "Its tier one mastery step up, against this patch's average Pick Score.",
-    g_skill: "Information only, no effect on any score. How much better one-tricks win than average players, then how many OTPs and their bot-lane games. Shown only with 20 or more bot-lane OTP games.",
-    top_upgrades: "One mastery step up only (Never played → Below average → Average → Good → Main). Shown only when the new Pick Score beats your current #3 pick.",
-    next_step: "Every carded champion now in B, C or D whose Pick Score one mastery step up would land in A or S. Same scoring code as the tier list; only the mastery changes. If nobody qualifies, the page names the closest one.",
-    n_champion: "A champion with a card, now in B, C or D.",
-    n_mastery: "Your mastery now → the next level (one step only).",
-    n_tier: "Its tier now → its tier one mastery step up, against this patch's average Pick Score.",
-    n_score: "Pick Score now → Pick Score one mastery step up.",
-    n_gain: "Pick Score points gained one mastery step up.",
-    n_skill: "Information only, no effect on any score. How much better one-tricks win than average players, shown only with 20 or more bot-lane OTP games.",
-
     utopy: "Alejandro's name for the long-term view: what each champion's Pick Score would be at every mastery level, so you can see which champions are worth learning. Only that champion's mastery changes; the tier colors use this patch's real tier cutoffs. Information only: it never changes a score or any other list.",
+    tier_S: "S: Pick Score +1.5 spreads or more above this patch's average.",
+    tier_A: "A: +0.5 to +1.5 spreads above this patch's average.",
+    tier_B: "B: within 0.5 spreads of this patch's average.",
+    tier_C: "C: 0.5 to 1.5 spreads below this patch's average.",
+    tier_D: "D: more than 1.5 spreads below this patch's average.",
     u_champion: "A champion with a card. Champions that are not ranked this patch sit in grey at the bottom, with the reason, their games and pick rate, and no score.",
-    u_never_played: "Pick Score if you were Never played on this champion. Colored by the tier it would reach. Your current level has an outline.",
+    u_never_played: "Pick Score if you were Never played on this champion. Colored by the tier it would reach. Your current level has a ring. A small ↑ means that score would beat your current #3 pick.",
     u_below_average: "Pick Score if you were Below average on this champion. Colored by the tier it would reach.",
     u_average: "Pick Score if you were Average on this champion. Colored by the tier it would reach.",
     u_good: "Pick Score if you were Good on this champion. Colored by the tier it would reach.",
     u_main: "Pick Score if you mained this champion. The page opens sorted by this column: the best champions to learn right now, by this model.",
     u_skill: "Information only, no effect on any score. How much better one-tricks win than average players, then how many OTPs and their bot-lane games. \"Too few games\" below 20 bot-lane OTP games.",
 
-    g_ceiling: "Quiet extra, information only: the best tier the champion could reach at Main mastery. It never decides who appears in either list.",
-    n_ceiling: "Quiet extra, information only: the best tier the champion could reach at Main mastery. It never decides who appears in either list.",
 
     // ---- patch mix and data label ----
     patch_mix: "Most champions (the middle 80%) get this share of their numbers from this patch; the rest comes from last patch. Share of this patch = this patch's games ÷ (this patch's games + 1,000).",

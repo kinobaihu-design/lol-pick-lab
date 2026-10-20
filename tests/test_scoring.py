@@ -220,7 +220,7 @@ class EndToEndTests(unittest.TestCase):
         expected = (2 * 60 + 60) / (patch.participants_weighted / 10)
         self.assertAlmostEqual(model.lane_pick_rate(patch, model.lane_numbers(patch, "50", "BOTTOM")), expected)
 
-    def test_tiers_and_advisor_only_use_champions_with_a_card(self):
+    def test_tiers_only_use_champions_with_a_card(self):
         old = config.MIN_REAL_GAMES
         config.MIN_REAL_GAMES = 300
         try:
@@ -230,7 +230,8 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(result["tier_stats"]["champions"], 1)
         self.assertEqual([c["name"] for c in result["pick_score_list"]], ["Jinx"])
         self.assertEqual(result["pick_score_list"][0]["spreads"], 0.0)
-        self.assertEqual(result["growth_advisor"], [])
+        for gone in ("growth_advisor", "next_step_list", "next_step_closest"):
+            self.assertNotIn(gone, result)
         self.assertNotIn("uncarded_champions", result)
 
     def test_otp_rule(self):
@@ -302,43 +303,9 @@ class NeedsACardTests(unittest.TestCase):
         self.assertEqual([c["name"] for c in self.result["pick_score_list"]], ["Jinx"])   # no Pick Score without a card
 
 
-class GrowthAdvisorRuleTests(unittest.TestCase):
-    """The advisor compares with the current #3 pick; fewer than 3 carded champions means no tips."""
+class TierTestBase(unittest.TestCase):
+    """Helpers for tests that need champions with a card, a tier and a Pick Score."""
 
-    def test_no_tips_with_fewer_than_three_carded_champions(self):
-        self.assertEqual(model.growth_advisor({}, {}, [{"pick_score": 80}, {"pick_score": 70}], 13.9, {}), [])
-
-    def test_a_tip_must_beat_the_third_best_pick(self):
-        cards = {c["riot_name"]: c for c in comfort.load_cards(CARDS_SNAPSHOT)}
-        average = comfort.average_trait_score(list(cards.values()))
-        names = ["Sivir", "Jinx", "Caitlyn", "Kalista"]
-        eligible, carded = {}, {}
-        for i, name in enumerate(names):
-            card = cards[name]
-            parts = comfort.comfort(card, average)
-            eligible[i] = {"id": i, "name": name, "has_card": True, "mastery": card["mastery"], "stats": 50.0,
-                           "otp_points": 50.0, "comfort": parts["comfort"],
-                           "pick_score": config.WEIGHT_STATS * 50 + config.WEIGHT_COMFORT * parts["comfort"] + config.WEIGHT_OTP * 50}
-            carded[i] = card
-        pick_list = sorted(eligible.values(), key=lambda v: -v["pick_score"])
-        stats = {"average_pick_score": 70.0, "spread": 5.0}
-        bar = pick_list[2]["pick_score"]
-        tips = model.growth_advisor(eligible, carded, pick_list, average, stats)
-        for tip in tips:
-            self.assertGreater(tip["pick_score_at_target"], bar)
-            self.assertGreater(tip["pick_score_at_target"], tip["pick_score_now"])
-        # raise Kalista's stats so that even her current score is a top pick: she no longer needs a tip
-        eligible[3]["stats"] = 99.0
-        eligible[3]["pick_score"] += config.WEIGHT_STATS * 49
-        pick_list = sorted(eligible.values(), key=lambda v: -v["pick_score"])
-        again = model.growth_advisor(eligible, carded, pick_list, average, stats)
-        self.assertTrue(all(t["pick_score_at_target"] > pick_list[2]["pick_score"] for t in again))
-
-
-class NextStepTests(unittest.TestCase):
-    """v0.39: both Growth lists use the NEXT mastery level only; the ceiling at Main is information only."""
-
-    STEPS = {"never_played": "below_average", "below_average": "average", "average": "good", "good": "main"}
     STATS = {"average_pick_score": 70.0, "spread": 5.0}
 
     def setUp(self):
@@ -355,104 +322,8 @@ class NextStepTests(unittest.TestCase):
         v["best_tier_at_main"] = model.score_at_mastery(v, card, self.average, self.STATS, "main")[1]
         return v, card
 
-    def run_list(self, rows):
-        eligible = {v["id"]: v for v, _ in rows}
-        carded = {v["id"]: c for v, c in rows}
-        return model.next_step_list(eligible, carded, [v for v, _ in rows], self.average, self.STATS)
 
-    def test_the_step_table_is_one_level_up_and_main_has_none(self):
-        self.assertEqual(config.GROWTH_TARGET, self.STEPS)
-        self.assertEqual(config.MASTERY_ORDER, ["never_played", "below_average", "average", "good", "main"])
-        for level, target in self.STEPS.items():
-            self.assertEqual(config.MASTERY_ORDER.index(target), config.MASTERY_ORDER.index(level) + 1)
-        self.assertNotIn("main", config.GROWTH_TARGET)
-
-    def test_top_upgrades_go_exactly_one_step_for_every_mastery_level(self):
-        fillers = [{"pick_score": 20.0, "id": 100 + i} for i in range(3)]             # a low #3 bar, so every tip can show
-        eligible, carded, pick = {}, {}, list(fillers)
-        for i, level in enumerate(config.MASTERY_ORDER):
-            v, card = self.champion(i, "Kalista", 100.0, "B", level)
-            eligible[i], carded[i] = v, card
-        tips = model.growth_advisor(eligible, carded, pick, self.average, self.STATS)
-        got = {t["current_mastery"]: t["target_mastery"] for t in tips}
-        self.assertEqual(got, self.STEPS)                                               # Main champions get no tip
-        for t in tips:
-            main_comfort = comfort.comfort(self.cards["Kalista"], self.average, t["target_mastery"])["comfort"]
-            expected = config.WEIGHT_STATS * 100 + config.WEIGHT_COMFORT * main_comfort + config.WEIGHT_OTP * 50
-            self.assertAlmostEqual(t["pick_score_at_target"], expected)
-            self.assertEqual(t["kind"] == "New champion", t["current_mastery"] == "never_played")
-
-    def test_next_step_list_uses_one_step_up_not_main(self):
-        # Never played Draven with strong data: one step up is only Below average, Main would be far better.
-        for stats in range(0, 101, 5):
-            v, card = self.champion(1, "Draven", float(stats), "C", "never_played")
-            step_after, step_tier = model.score_at_mastery(v, card, self.average, self.STATS, "below_average")
-            rows, _ = self.run_list([(v, card)])
-            self.assertEqual([r["tier_next"] for r in rows], [step_tier] if step_tier in "AS" else [], stats)
-            for r in rows:
-                self.assertEqual(r["next_mastery"], "below_average")
-                self.assertAlmostEqual(r["pick_score_next"], step_after)
-                self.assertAlmostEqual(r["gain"], step_after - v["pick_score"])
-
-    def test_the_sweep_covers_a_s_and_neither(self):
-        seen = set()
-        for stats in range(0, 101, 5):
-            v, card = self.champion(1, "Kalista", float(stats), "B", "average")
-            after = model.score_at_mastery(v, card, self.average, self.STATS, "good")[0]
-            z = (after - 70.0) / 5.0
-            expected = "S" if z >= 1.5 else "A" if z >= 0.5 else "none"
-            seen.add(expected)
-            rows, _ = self.run_list([(v, card)])
-            self.assertEqual([r["tier_next"] for r in rows], [] if expected == "none" else [expected], stats)
-        self.assertEqual(seen, {"S", "A", "none"})
-
-    def test_the_ceiling_at_main_never_decides_who_is_listed(self):
-        found = False
-        for stats in range(0, 101, 5):
-            v, card = self.champion(1, "Zeri", float(stats), "B", "never_played")
-            step_tier = model.score_at_mastery(v, card, self.average, self.STATS, "below_average")[1]
-            if step_tier in "AS" or v["best_tier_at_main"] not in "AS":
-                continue
-            found = True                                                # reaches A or S at Main, but not one step up
-            rows, closest = self.run_list([(v, card)])
-            self.assertEqual(rows, [], stats)
-            self.assertIsNotNone(closest)
-        self.assertTrue(found)
-        # a listed champion carries its ceiling as plain information
-        v, card = self.champion(1, "Kalista", 100.0, "B", "average")
-        rows, _ = self.run_list([(v, card)])
-        self.assertEqual(rows[0]["tier_at_main"], v["best_tier_at_main"])
-        # and changing the ceiling field changes nothing in the lists
-        v["best_tier_at_main"] = "D"
-        again, _ = self.run_list([(v, card)])
-        self.assertEqual([r["name"] for r in again], [r["name"] for r in rows])
-
-    def test_only_b_c_d_champions_not_at_main_are_listed(self):
-        rows, _ = self.run_list([self.champion(1, "Kalista", 100.0, "B", "average"),
-                                 self.champion(2, "Sivir", 100.0, "A", "good"),         # already A: not B, C or D
-                                 self.champion(3, "Jinx", 100.0, "C", "main")])         # at Main: no next step
-        self.assertEqual([r["name"] for r in rows], ["Kalista"])
-
-    def test_closest_line_when_the_list_is_empty(self):
-        a_line = 70.0 + 0.5 * 5.0
-        low = self.champion(1, "Draven", 0.0, "D", "never_played")
-        mid = self.champion(2, "Nilah", 40.0, "C", "never_played")
-        rows, closest = self.run_list([low, mid])
-        self.assertEqual(rows, [])
-        afters = {}
-        for v, card in (low, mid):
-            afters[v["name"]] = model.score_at_mastery(v, card, self.average, self.STATS, "below_average")[0]
-        self.assertEqual(closest["name"], max(afters, key=afters.get))                  # the nearest to the A line
-        self.assertAlmostEqual(closest["points_short"], a_line - afters[closest["name"]])
-        self.assertGreater(closest["points_short"], 0)
-        # with someone listed there is no closest line
-        rows, closest = self.run_list([self.champion(3, "Kalista", 100.0, "B", "average")])
-        self.assertEqual(len(rows), 1)
-        self.assertIsNone(closest)
-        self.assertEqual(model.next_step_list({}, {}, [], self.average, {"average_pick_score": None, "spread": 0.0}), ([], None))
-
-
-class UtopyTableTests(NextStepTests):
+class UtopyTableTests(TierTestBase):
     """v1.3: the Utopy table, "if I mained everyone". Information only: no score and no other list changes."""
 
     def table(self, rows):
@@ -497,16 +368,14 @@ class UtopyTableTests(NextStepTests):
         carded = {v["id"]: c for v, c in rows}
         pick = [v for v, _ in rows]
         before_inputs = copy.deepcopy((eligible, pick))
-        next_before = model.next_step_list(eligible, carded, pick, self.average, self.STATS)
-        tips_before = model.growth_advisor(eligible, carded, pick, self.average, self.STATS)
         model.utopy_table(eligible, carded, pick, self.average, self.STATS)
-        self.assertEqual((eligible, pick), before_inputs)
-        self.assertEqual(model.next_step_list(eligible, carded, pick, self.average, self.STATS), next_before)
-        self.assertEqual(model.growth_advisor(eligible, carded, pick, self.average, self.STATS), tips_before)
+        self.assertEqual((eligible, pick), before_inputs)          # no score or tier was written to
 
-    def test_the_old_utopy_list_is_gone(self):
-        self.assertFalse(hasattr(model, "utopy_list"))
-        self.assertFalse(hasattr(config, "UTOPY_LEVELS"))
+    def test_the_old_lists_are_gone(self):
+        for name in ("utopy_list", "growth_advisor", "next_step_list"):
+            self.assertFalse(hasattr(model, name), name)
+        for name in ("UTOPY_LEVELS", "GROWTH_TARGET", "GROWTH_BEAT_RANK"):
+            self.assertFalse(hasattr(config, name), name)
 
 
 if __name__ == "__main__":

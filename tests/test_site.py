@@ -140,8 +140,7 @@ class SiteFilesTests(unittest.TestCase):
         """Every sortable title in every table has a matching entry in format.js, in that table's own column set."""
         source = read("format.js")
         sets = {"tier-table": "SORT_COLUMNS", "meta-table": "META_COLUMNS", "needs-table": "META_COLUMNS",
-                "comfort-table": "COMFORT_COLUMNS", "growth-table": "GROWTH_COLUMNS",
-                "next-table": "NEXT_COLUMNS", "utopy-table": "UTOPY_COLUMNS"}
+                "comfort-table": "COMFORT_COLUMNS", "utopy-table": "UTOPY_COLUMNS"}
         for table, name in sets.items():
             block = re.search(r"var %s = \{(.*?)\n  \};" % name, source, re.S).group(1)
             keys = re.findall(r'data-sort="([^"]+)"', table_html(table))
@@ -199,17 +198,13 @@ class TabTests(unittest.TestCase):
         for word in ("<input", "<textarea", "<select", "contenteditable"):
             self.assertNotIn(word, read("index.html"))            # view only, no editing
 
-    def test_growth_tab_has_the_skill_column_and_no_ban_list(self):
-        heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("growth-table"))]
-        self.assertIn("skill pays off?", heads)
-        self.assertIn("gain", heads)
+    def test_growth_tab_is_only_the_utopy_table_and_there_is_no_ban_list(self):
         html = read("index.html")
-        self.assertIn("Top upgrades", html)
-        self.assertIn("Next step to A or S", html)
-        self.assertNotIn("Could reach", html)
-        nxt = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("next-table"))]
-        self.assertEqual(nxt, ["champion", "mastery now &rarr; next", "tier now &rarr; next", "pick score", "gain", "ceiling", "skill pays off?"])
-        self.assertIn("ceiling", heads)
+        heads = [h.lower() for h in re.findall(r"<th[^>]*>(.*?)</th>", table_html("utopy-table"))]
+        self.assertEqual(heads, ["champion", "never", "below avg", "avg", "good", "main", "skill pays off?"])
+        for gone in ("Top upgrades", "Next step to A or S", "Could reach", 'id="growth-table"', 'id="next-table"', "Ceiling"):
+            self.assertNotIn(gone, html)
+        self.assertNotRegex(read("app.js") + read("format.js") + read("help.js"), r"growth_advisor|next_step|growthTip|GROWTH_COLUMNS|NEXT_COLUMNS")
         self.assertNotRegex(read("index.html") + read("app.js"), r"(?i)ban threat|ban suggestion|ban list")
         with open(os.path.join(ROOT, "scoring", "model.py"), encoding="utf-8") as f:
             self.assertNotRegex(f.read(), r"ban_threat|def ban_|ROLE_NAMES")      # the old ban code is gone
@@ -382,37 +377,6 @@ class SiteDataTests(unittest.TestCase):
         for row in self.data["pick_score_list"]:
             self.assertEqual(row["real_games"], row["real_games_this_patch"] + row["real_games_last_patch"], row["name"])
 
-    def test_next_step_list_uses_one_step_up_and_ceiling_is_only_information(self):
-        cards = self.cards_by_name()
-        rows = {r["id"]: r for r in self.data["pick_score_list"]}
-        tiers = self.data["tier_stats"]
-        mean, spread = tiers["average_pick_score"], tiers["spread"]
-        expected = set()
-        for row in rows.values():
-            card = cards[model.normalise(row["riot_name"])]
-            main_comfort = comfort.comfort(card, self.data["trait_average"], "main")["comfort"]
-            main_score = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * main_comfort + config.WEIGHT_OTP * row["otp_points"]
-            self.assertAlmostEqual(row["pick_score_at_main"], main_score, delta=0.02, msg=row["name"])      # ceiling: information
-            self.assertEqual(row["best_tier_at_main"], model.tier_of(model.spreads_from_average(main_score, mean, spread)), row["name"])
-            if row["mastery"] == "main" or row["tier"] not in "BCD":
-                continue
-            step = config.GROWTH_TARGET[row["mastery"]]
-            step_comfort = comfort.comfort(card, self.data["trait_average"], step)["comfort"]
-            step_score = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * step_comfort + config.WEIGHT_OTP * row["otp_points"]
-            if model.tier_of(model.spreads_from_average(step_score, mean, spread)) in "AS":
-                expected.add(row["id"])
-        self.assertEqual({r["id"] for r in self.data["next_step_list"]}, expected)
-        self.assertNotIn("reach_list", self.data)
-        for r in self.data["next_step_list"]:
-            self.assertEqual(r["tier_now"], rows[r["id"]]["tier"])
-            self.assertEqual(r["next_mastery"], config.GROWTH_TARGET[rows[r["id"]]["mastery"]])
-            self.assertIn(r["tier_next"], "AS")
-            self.assertEqual(r["tier_at_main"], rows[r["id"]]["best_tier_at_main"])
-        if expected:
-            self.assertIsNone(self.data["next_step_closest"])
-        else:
-            self.assertGreater(self.data["next_step_closest"]["points_short"], 0)
-
     def test_utopy_table_matches_a_fresh_calculation_and_changes_no_score(self):
         """Every ranked champion has the 5 levels; each score and tier recomputes from the saved numbers."""
         cards = self.cards_by_name()
@@ -444,48 +408,36 @@ class SiteDataTests(unittest.TestCase):
                 self.assertIn(key, r, r["name"])
             self.assertNotIn(r["name"], [x["name"] for x in self.data["pick_score_list"]])
 
-    def test_utopy_table_is_last_on_the_growth_tab_with_its_texts(self):
+    def test_utopy_table_is_the_growth_tab_with_its_new_look(self):
         html = read("index.html")
         growth = html[html.index('id="tab-growth"'):]
-        self.assertLess(growth.index('id="next-table"'), growth.index('id="utopy-table"'))
-        self.assertLess(growth.index('id="growth-table"'), growth.index('id="next-table"'))
-        for text in ("Utopy table", "if I mained everyone", "Never played", "Below average", "Average", "Good", "Main",
-                     'id="utopy-basis"', "Skill pays off"):
+        for text in ("Utopy table", "if I mained everyone", 'id="utopy-basis"', 'id="utopy-legend"', "Skill pays off"):
             self.assertIn(text, growth)
         self.assertNotIn("Utopy picks", growth)
         self.assertNotIn("Steps away", growth)
-        app = read("app.js")
+        for tier in "SABCD":                                            # the tier color legend, with a hover for each
+            self.assertIn('class="tier tier-%s" data-tip-key="tier_%s"' % (tier, tier), growth)
+        app, css = read("app.js"), read("style.css")
         self.assertIn("Based on patch", app)
         self.assertIn("can change each patch", app)
         self.assertIn('"u_main"', app)                                  # opens sorted by the Main column
         self.assertIn("utopy-grey", app)                                # unranked rows are grey, at the bottom
-        self.assertIn("utopy-now", app)                                 # the current level is highlighted
+        self.assertIn("utopy-now", app)                                 # the current level has the ring
+        self.assertIn("utopy-up", app)                                  # the up arrow
+        self.assertIn("i > here", app)                                  # ... only above the current level
+        self.assertIn("state.third", app)                               # ... when the score beats the current #3 pick
+        self.assertIn("skill-pos", app)
+        self.assertIn("skill-neg", app)
+        self.assertIn("sampleLabel", app)                               # sample size under the name, like the Tier list
+        self.assertIn("dataChip", app)                                  # data-freshness chip, like the Tier list
         self.assertNotIn("utopy_list", app + read("format.js"))
-
-    def test_growth_tips_follow_the_number_3_rule(self):
-        """A tip exists exactly when the target-mastery Pick Score beats both the champion's own score and the current #3 pick."""
-        cards = self.cards_by_name()
-        rows = self.data["pick_score_list"]
-        third = sorted((r["pick_score"] for r in rows), reverse=True)[config.GROWTH_BEAT_RANK - 1]
-        tips = {t["id"]: t for t in self.data["growth_advisor"]}
-        for row in rows:
-            if row["mastery"] == "main":
-                self.assertNotIn(row["id"], tips, row["name"])
-                continue
-            target = config.GROWTH_TARGET[row["mastery"]]
-            new_comfort = comfort.comfort(cards[model.normalise(row["riot_name"])], self.data["trait_average"], target)["comfort"]
-            after = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * new_comfort + config.WEIGHT_OTP * row["otp_points"]
-            should = after > third + 0.02 and after > row["pick_score"]
-            if abs(after - third) < 0.02:
-                continue                                    # too close to call after rounding
-            self.assertEqual(row["id"] in tips, should, "%s: %.2f vs #3 %.2f" % (row["name"], after, third))
-            if should:
-                self.assertAlmostEqual(tips[row["id"]]["pick_score_at_target"], after, delta=0.02)
-                self.assertAlmostEqual(tips[row["id"]]["gain"], after - row["pick_score"], delta=0.03)
-        for tip in tips.values():
-            self.assertGreater(tip["pick_score_at_target"], third)
-            self.assertIn(tip["kind"], ("Upgrade", "New champion"))
-            self.assertEqual(tip["kind"] == "New champion", tip["current_mastery"] == "never_played")
+        # one ring that shows on every tier color: two tones, not a single outline
+        ring = re.search(r"\.utopy-now \{[^}]*\}", css).group(0)
+        self.assertIn("box-shadow", ring)
+        self.assertNotIn("outline", ring)
+        self.assertRegex(css, r"#utopy-table \.u-score \{ width: \d+px")        # all 5 score columns the same fixed width
+        self.assertIn("table-layout: fixed", css)
+        self.assertRegex(css, r"#utopy-wrap \{ overflow-x: auto")                # sideways scroll on a phone
 
     def test_growth_tips_do_not_change_any_score(self):
         """The skill-pays-off line reads the OTP numbers; the Pick Score still uses only the OTP points."""
@@ -500,7 +452,7 @@ class SiteDataTests(unittest.TestCase):
             source = f.read()
         for key in ("win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games", "cards_not_ranked",
                     "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort", "comfort_parts",
-                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor", "next_step_list", "next_step_closest", "utopy_table",
+                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "utopy_table",
                     "pick_score_at_main", "best_tier_at_main"):
             self.assertIn('"%s"' % key, source)
 

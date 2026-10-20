@@ -231,27 +231,6 @@ test("Comfort tab sorts by every column", () => {
   assert.strictEqual(F.sortRows(list, "difficulty", "asc", F.COMFORT_COLUMNS).map(c => c.name).join(""), "AB");   // easiest first
 });
 
-test("Growth tips: wording, headline and sorting (empty skill values go last)", () => {
-  const tip = { name: "Kalista", kind: "New champion", current_mastery: "never_played", target_mastery: "good",
-                pick_score_now: 71, pick_score_at_target: 79, gain: 8, would_rank: 2, tier_at_target: "A" };
-  assert.strictEqual(F.growthHeadline(tip), "Kalista: 71.0 → 79.0 if Good");
-  assert.ok(F.growthTipText(tip).startsWith("You've never played Kalista, but at Good it would rank #2 this patch"));
-  const up = { name: "Jinx", kind: "Upgrade", current_mastery: "good", target_mastery: "main", pick_score_now: 74, pick_score_at_target: 80, gain: 6, would_rank: 1, tier_at_target: "S" };
-  assert.ok(F.growthTipText(up).startsWith("You're Good with Jinx; at Main it would go from 74.0 to 80.0"));
-  const tips = [
-    Object.assign({}, up, { skill_delta: null }),
-    Object.assign({}, tip, { skill_delta: 2 }),
-    Object.assign({}, up, { name: "Zed", skill_delta: 5 })
-  ];
-  const by = (key, dir) => F.sortRows(tips, key, dir, F.GROWTH_COLUMNS, t => t.pick_score_at_target).map(t => t.name);
-  assert.deepStrictEqual(by("g_skill", "desc"), ["Zed", "Kalista", "Jinx"]);
-  assert.deepStrictEqual(by("g_skill", "asc"), ["Kalista", "Zed", "Jinx"]);     // null stays last both ways
-  assert.deepStrictEqual(by("g_champion", "asc"), ["Jinx", "Kalista", "Zed"]);
-  Object.keys(F.GROWTH_COLUMNS).forEach(key => assert.ok(["asc", "desc"].includes(F.firstDirection(key, F.GROWTH_COLUMNS))));
-});
-
-// ---- v0.38 ----
-
 test("colored boxes use the tier steps: 0.5 and 1.5 spreads from the average", () => {
   const steps = S.SPREAD_STEPS;
   assert.deepStrictEqual(steps, { mild: 0.5, strong: 1.5 });
@@ -310,39 +289,17 @@ test("best reachable tier is told only for champions that can't reach A at Main"
   assert.strictEqual(F.bestReachText({}), "");
 });
 
-test("Next step to A or S table sorts by every column; empty skill goes last", () => {
-  const list = [
-    { name: "Kai", current_mastery: "average", ceiling: "A", pick_score_next: 75, gain: 3, tier_next: "A", skill_delta: 3 },
-    { name: "Zed", current_mastery: "never_played", ceiling: "S", pick_score_next: 80, gain: 4, tier_next: "S", skill_delta: null },
-    { name: "Bob", current_mastery: "good", ceiling: "B", pick_score_next: 72, gain: 2, tier_next: "A", skill_delta: 1 }
-  ];
-  const by = (k, d) => F.sortRows(list, k, d, F.NEXT_COLUMNS, t => t.pick_score_next).map(t => t.name).join("");
-  assert.strictEqual(by("n_score", "desc"), "ZedKaiBob");
-  assert.strictEqual(by("n_tier", "desc"), "ZedKaiBob");
-  assert.strictEqual(by("n_gain", "asc"), "BobKaiZed");
-  assert.strictEqual(by("n_champion", "asc"), "BobKaiZed");
-  assert.strictEqual(by("n_mastery", "asc"), "ZedKaiBob");     // weakest mastery first
-  assert.strictEqual(by("n_ceiling", "desc"), "ZedKaiBob");
-  assert.strictEqual(by("n_skill", "desc"), "KaiBobZed");
-  assert.strictEqual(by("n_skill", "asc"), "BobKaiZed");
-  assert.strictEqual(F.REACH_COLUMNS, undefined);
-});
-
-test("ceiling at Main is a quiet text; the closest line says who is nearest", () => {
-  assert.strictEqual(F.ceilingText({ best_tier_at_main: "S" }), "at Main: S");
-  assert.strictEqual(F.ceilingText({}), "");
-  assert.strictEqual(F.ceilingText(undefined), "");
-  assert.strictEqual(F.closestText({ name: "Lucian", points_short: 1.234 }), "None this patch \u00b7 closest: Lucian, 1.2 points short");
-  assert.strictEqual(F.closestText(null), "None this patch");
-  // the Growth Top upgrades table can be sorted by the ceiling too
-  const rows = [{ name: "A", ceiling: "B" }, { name: "B", ceiling: "S" }];
-  assert.strictEqual(F.sortRows(rows, "g_ceiling", "desc", F.GROWTH_COLUMNS, () => 0).map(r => r.name).join(""), "BA");
-});
-
 test("Utopy table: skill line, the reason a champion has no score, and the grey row numbers", () => {
   assert.strictEqual(F.utopySkillText({ otp_delta: 4.6, otp_games: 340, otp_players: 12 }, 20), "OTP +4.6% · 12 OTPs · 340 games");
   assert.strictEqual(F.utopySkillText({ otp_delta: 4.6, otp_games: 5, otp_players: 2 }, 20), "too few games");
   assert.strictEqual(F.utopySkillText(undefined, 20), "too few games");
+  // the two parts the table styles: bold percent (green or red by sign) and the quiet rest
+  const up = F.skillParts({ otp_delta: 4.6, otp_games: 340, otp_players: 12 }, 20);
+  assert.deepStrictEqual([up.percent, up.rest, up.delta > 0], ["OTP +4.6%", "12 OTPs · 340 games", true]);
+  const down = F.skillParts({ otp_delta: -1.2, otp_games: 1500, otp_players: 1 }, 20);
+  assert.deepStrictEqual([down.percent, down.rest, down.delta < 0], ["OTP −1.2%", "1 OTP · 1,500 games", true]);
+  assert.strictEqual(F.skillParts({ otp_delta: 4.6, otp_games: 5, otp_players: 2 }, 20), null);
+  assert.strictEqual(F.skillParts(undefined, 20), null);
   assert.strictEqual(F.utopyReason(["bot-lane share under 10%", "bot-lane pick rate under 0.8%"]), "share under 10%, pick rate under 0.8%");
   assert.strictEqual(F.utopyReason(["bot-lane pick rate under 0.8%"]), "pick rate under 0.8%");
   assert.strictEqual(F.utopyReason(["under 1000 real games", "bot-lane pick rate under 0.8%"]), "low data");

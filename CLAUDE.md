@@ -86,7 +86,7 @@ Bot lane includes APCs (bot-lane mages). They're in the same list as the ADCs an
 6. **Tier (v0.36): the Pick Score only.** Each champion is compared with this patch's average Pick Score (champions with a card), measured in standard deviations ("spreads"). **S** +1.5 spreads or more · **A** +0.5 to +1.5 · **B** −0.5 to +0.5 · **C** −1.5 to −0.5 · **D** below −1.5. There is no stats floor and no win rate condition on S any more. **Win rate warning (display only):** a champion whose win rate is 1.5% or more below the Diamond+ average shows a ⚠ next to its win rate; it never changes the tier (`WIN_RATE_WARNING_DELTA` in `scoring/config.py`). The boundaries are in `scoring/config.py` (`TIER_BOUNDARIES`).
 
 **Other lists:**
-- **Growth advisor** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at the NEXT mastery level only (v0.39): Never played → Below average → Average → Good → Main (before v0.39 Never played and Below average jumped straight to Good). It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Below average" is the same idea, one step). There are two kinds of advice:
+- **Growth advisor (REMOVED in v1.4; history only)** (replaces "Worth learning"). It nudges the owner toward their preferred types and toward champions with strong stats, instead of keeping them on their mains forever. Only champions with a card count (v0.35). For each champion the owner isn't a Main on, the app calculates its Pick Score at the NEXT mastery level only (v0.39): Never played → Below average → Average → Good → Main (before v0.39 Never played and Below average jumped straight to Good). It shows a suggestion only when that score would beat the owner's current #3 pick, with the gain ("Kalista: 71 → 79 if Below average" is the same idea, one step). There are two kinds of advice:
   - **Upgrade:** "You're Good with Jinx; at Main she'd jump from 74 to 80, S tier."
   - **New champion:** "You've never played Kalista, but at Good she'd rank #2 this patch; worth starting."
   - Details get polished in Phase 2 with real data.
@@ -217,6 +217,14 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Aphelios:** hard to learn but rewarding; strong vs divers. OTPs likely beat his average.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
+
+## Brief changes v1.4 (no change to the Pick Score), Oct 20, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Growth tab = the Utopy table only.** "Top upgrades" and "Next step to A or S" (the Growth advisor lists) are **removed** from the page, the scores file (`growth_advisor`, `next_step_list`, `next_step_closest`), the code (`growth_advisor`, `next_step_list`, `GROWTH_TARGET`, `GROWTH_BEAT_RANK`) and the tests. "Needs a card" (Meta tab) stays. The tab keeps the name Growth. The Tier list's "Best reachable" hover stays (`pick_score_at_main`, `best_tier_at_main` are still written). Tests check every Pick Score and tier still equals the recipe.
+- **Utopy table, new look (same data and logic):** short headers (Never · Below avg · Avg · Good · Main), a narrower Champion column and 5 equal fixed-width score columns; the current level has a two-tone ring (dark inside, white outside; visible on every tier color); a small ↑ on a cell ABOVE the current level whose score beats the current #3 pick (worked out by the page from the Pick Score list); the skill line has the OTP % bold (green if positive, red if negative) and the rest small and grey; under each name the sample-size label (Low / Medium / High) and the "Data: x% this patch" chip, as on the Tier list; a tier color legend (S A B C D, hover shows the cutoffs); grey unranked rows stay last; sideways scroll on a phone. Sorting and the default (Main) are unchanged.
+- **Standing rule (owner, Oct 20):** run the rescore in the same build only when a field is ADDED to the scores file (ask first if a collector run would have to be cancelled). Removing fields needs no rescore; the next collector run writes the clean file.
 
 ## Brief changes v1.3 (no change to the Pick Score), Oct 20, 2026
 
@@ -507,6 +515,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v1.4** (Oct 20, 2026): no score change. Top upgrades and Next step to A or S removed; the Utopy table gets its new look (ring, up arrows, labels, legend).
 - **v1.3** (Oct 20, 2026): no score change. Utopy table "if I mained everyone" replaces the Utopy picks list on the Growth tab.
 - **v1.2** (Oct 19, 2026): no score change. Run summary shows peak memory, the runner's memory and the season player count, with a 60% warning.
 - **v1.1** (Oct 16, 2026): no score change. Season file safe for a full year (in planning; see "Brief changes v1.0 + v1.1").

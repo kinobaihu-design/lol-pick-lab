@@ -397,8 +397,6 @@ def score_all(root, cards=None, now=None):
     for i, v in enumerate(meta_list, 1):
         v["meta_rank"] = i
 
-    advisor = growth_advisor(eligible, carded, pick_list, trait_average, tier_stats)
-    next_step, next_step_closest = next_step_list(eligible, carded, pick_list, trait_average, tier_stats)
     utopy = utopy_table(eligible, carded, pick_list, trait_average, tier_stats)
 
     def clean(v):
@@ -457,53 +455,12 @@ def score_all(root, cards=None, now=None):
         "needs_a_card": [clean(v) for v in meta_list if not v["has_card"]],
         "tier_stats": tier_stats,
         "excluded_by_pool_rule": excluded,
-        "next_step_list": next_step,
-        "next_step_closest": next_step_closest,
         "utopy_table": utopy,
-        "growth_advisor": advisor,
         "near_misses": sorted(why_out.values(), key=lambda row: (-row["real_games"], row["name"]))[:15],
     }
 
 
-# ---------------------------------------------------------------- Growth advisor
-
-
-def growth_advisor(eligible, carded, pick_list, trait_average, tier_stats):
-    """Suggest champions that would beat the owner's current #3 pick at a target mastery.
-
-    Only champions with a card (Comfort needs one). Never played and Below average are scored
-    as if Good; Average and Good one level up. The tier at the target is read against the
-    patch's current average and spread.
-    """
-    if len(pick_list) < config.GROWTH_BEAT_RANK:
-        return []
-    bar = pick_list[config.GROWTH_BEAT_RANK - 1]["pick_score"]
-    scores = {v["id"]: v["pick_score"] for v in pick_list}
-
-    suggestions = []
-    for k, v in eligible.items():
-        if not v["has_card"] or v["mastery"] == "main":
-            continue
-        current_mastery = v["mastery"]
-        target = config.GROWTH_TARGET[current_mastery]
-        new_comfort = comfort_module.comfort(carded[k], trait_average, target)["comfort"]
-        before = v["pick_score"]
-        kind = "New champion" if current_mastery == "never_played" else "Upgrade"
-        after = (config.WEIGHT_STATS * v["stats"] + config.WEIGHT_COMFORT * new_comfort
-                 + config.WEIGHT_OTP * v["otp_points"])
-        if after <= bar or after <= before:
-            continue
-        others = [s for cid, s in scores.items() if cid != v["id"]]
-        rank = 1 + sum(1 for s in others if s > after)
-        tier = tier_of(spreads_from_average(after, tier_stats["average_pick_score"], tier_stats["spread"]))
-        suggestions.append({
-            "id": v["id"], "name": v["name"], "kind": kind,
-            "current_mastery": current_mastery, "target_mastery": target,
-            "pick_score_now": before, "pick_score_at_target": after, "gain": after - before,
-            "would_rank": rank, "tier_at_target": tier,
-        })
-    suggestions.sort(key=lambda s: -s["pick_score_at_target"])
-    return suggestions
+# ---------------------------------------------------------------- what-if scores (Utopy table)
 
 
 def score_at_mastery(v, card, trait_average, tier_stats, mastery):
@@ -514,36 +471,6 @@ def score_at_mastery(v, card, trait_average, tier_stats, mastery):
              + config.WEIGHT_OTP * v["otp_points"])
     spreads = spreads_from_average(after, tier_stats["average_pick_score"], tier_stats["spread"])
     return after, tier_of(spreads)
-
-
-def next_step_list(eligible, carded, pick_list, trait_average, tier_stats):
-    """"Next step to A or S": every carded champion now in B, C or D whose Pick Score ONE mastery step up
-    (Never played -> Below average -> ... -> Main) would land in A or S. Returns (rows, closest).
-
-    `closest` is the B, C or D champion nearest to the A line after one step (how many points short), or
-    None; the page shows it when the list is empty. The ceiling at Main (`tier_at_main`) is information only
-    and never decides who is listed. Nothing here changes a score.
-    """
-    if not pick_list:
-        return [], None
-    a_line = tier_stats["average_pick_score"] + dict(config.TIER_BOUNDARIES)["A"] * tier_stats["spread"]
-    rows, closest = [], None
-    for v in pick_list:
-        if v["tier"] not in ("B", "C", "D") or v["mastery"] not in config.GROWTH_TARGET:
-            continue
-        k = next(key for key, e in eligible.items() if e is v)
-        step = config.GROWTH_TARGET[v["mastery"]]
-        after, tier = score_at_mastery(v, carded[k], trait_average, tier_stats, step)
-        if tier in ("A", "S"):
-            rows.append({"id": v["id"], "name": v["name"], "current_mastery": v["mastery"], "next_mastery": step,
-                         "tier_now": v["tier"], "tier_next": tier,
-                         "pick_score_now": v["pick_score"], "pick_score_next": after, "gain": after - v["pick_score"],
-                         "tier_at_main": v["best_tier_at_main"]})
-        elif closest is None or after > closest["pick_score_next"]:
-            closest = {"id": v["id"], "name": v["name"], "next_mastery": step, "tier_now": v["tier"],
-                       "pick_score_next": after, "points_short": a_line - after}
-    rows.sort(key=lambda r: -r["pick_score_next"])
-    return rows, (None if rows else closest)
 
 
 def utopy_table(eligible, carded, pick_list, trait_average, tier_stats):
