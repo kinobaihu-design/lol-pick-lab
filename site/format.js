@@ -307,25 +307,25 @@
     return "None this patch \u00b7 closest: " + closest.name + ", " + number(closest.points_short, 1) + " points short";
   }
 
-  // ---- Utopy picks (v0.40): long-term goals, information only ----
-  function stepsText(n) { return n + (n === 1 ? " step" : " steps"); }
-
-  // "68.0 \u2192 78.5 at Main", or "68.0 \u2192 74.1 at Good \u00b7 78.5 at Main" when both levels reach S.
-  function utopyScoresText(row) {
-    return number(row.pick_score_now, 1) + " \u2192 " + row.scores.map(function (s) {
-      return number(s.score, 1) + " at " + masteryText(s.level);
-    }).join(" \u00b7 ");
-  }
-
+  // ---- Utopy table (v1.3): "if I mained everyone" ----
   // The compact skill line, or "too few games" (below the minimum bot-lane OTP games).
   function utopySkillText(champ, minGames) {
     return skillPaysOffText(champ, minGames) || "too few games";
   }
 
-  // The one line shown when "Utopy picks" is empty.
-  function utopyClosestText(closest) {
-    if (!closest) return "None this patch";
-    return "None this patch \u00b7 closest: " + closest.name + ", " + number(closest.points_short, 1) + " points short of S at Main";
+  // Why a carded champion has no score this patch, in plain words: "low data" (under the game floor), else the
+  // failed filters without the "bot-lane" prefix ("pick rate under 0.8%").
+  function utopyReason(failed) {
+    var list = failed || [];
+    if (list.some(function (f) { return /real games/.test(f); })) return "low data";
+    return list.map(function (f) { return f.replace(/^bot-lane /, ""); }).join(", ") || "not ranked";
+  }
+
+  // Games and pick rate this patch for a grey row ("3,851 games this patch · pick rate 0.4%").
+  function utopyUnrankedNumbers(row) {
+    var games = row.real_games_this_patch != null ? row.real_games_this_patch : row.real_games;
+    var rate = row.pick_rate == null ? "n/a" : (100 * row.pick_rate).toFixed(1) + "%";
+    return Math.round(games).toLocaleString("en-US") + " games this patch \u00b7 pick rate " + rate;
   }
 
   // Hover text on a name in the Tier list for a champion that can't reach A even at Main.
@@ -391,13 +391,17 @@
     g_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
   };
 
+  // Pick Score at a mastery level, or null for a grey row (no score). Null always sorts last.
+  function utopyScore(t, level) { return t.unranked || !t.scores ? null : t.scores[level].score; }
+
   var UTOPY_COLUMNS = {
-    u_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
-    u_mastery: { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.current_mastery); } },
-    u_level:  { first: "asc", value: function (t) { return MASTERY_ORDER.indexOf(t.first_level); } },
-    u_steps:  { first: "asc", value: function (t) { return t.steps; } },
-    u_score:  { first: "desc", value: function (t) { return t.scores[t.scores.length - 1].score; } },
-    u_skill:  { first: "desc", value: function (t) { return t.skill_delta; } }
+    u_champion: { first: "asc", value: function (t) { return t.unranked ? null : t.name.toLowerCase(); } },
+    u_never_played: { first: "desc", value: function (t) { return utopyScore(t, "never_played"); } },
+    u_below_average: { first: "desc", value: function (t) { return utopyScore(t, "below_average"); } },
+    u_average: { first: "desc", value: function (t) { return utopyScore(t, "average"); } },
+    u_good:   { first: "desc", value: function (t) { return utopyScore(t, "good"); } },
+    u_main:   { first: "desc", value: function (t) { return utopyScore(t, "main"); } },
+    u_skill:  { first: "desc", value: function (t) { return t.unranked ? null : t.skill_delta; } }
   };
   var NEXT_COLUMNS = {
     n_champion: { first: "asc", value: function (t) { return t.name.toLowerCase(); } },
@@ -466,7 +470,7 @@
               hasWinRateWarning: hasWinRateWarning, otpText: otpText, notRankedText: notRankedText,
               sortRows: sortRows, firstDirection: firstDirection, SORT_COLUMNS: SORT_COLUMNS,
               META_COLUMNS: META_COLUMNS, COMFORT_COLUMNS: COMFORT_COLUMNS, GROWTH_COLUMNS: GROWTH_COLUMNS, NEXT_COLUMNS: NEXT_COLUMNS, UTOPY_COLUMNS: UTOPY_COLUMNS,
-              stepsText: stepsText, utopyScoresText: utopyScoresText, utopySkillText: utopySkillText, utopyClosestText: utopyClosestText,
+              utopySkillText: utopySkillText, utopyReason: utopyReason, utopyUnrankedNumbers: utopyUnrankedNumbers,
               normalise: normalise, cardInfo: cardInfo, applyCards: applyCards, meanAndSpread: meanAndSpread,
               spreadStep: spreadStep, stepClass: stepClass, patchMix: patchMix, patchMixText: patchMixText,
               bestReachText: bestReachText, ceilingText: ceilingText, closestText: closestText,

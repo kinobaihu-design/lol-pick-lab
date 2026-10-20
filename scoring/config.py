@@ -98,8 +98,6 @@ WIN_RATE_WARNING_DELTA = -1.5
 # NEXT mastery level only (v0.39): Never played -> Below average -> Average -> Good -> Main. Main has no next level.
 # "Ceiling at Main" is shown as information only and never decides who appears in either list.
 GROWTH_TARGET = {"never_played": "below_average", "below_average": "average", "average": "good", "good": "main"}
-# Utopy picks (v0.40, information only): the mastery levels tried as long-term goals.
-UTOPY_LEVELS = ["good", "main"]
 # Compared with the owner's current #3 pick.
 GROWTH_BEAT_RANK = 3
 

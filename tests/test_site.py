@@ -413,55 +413,54 @@ class SiteDataTests(unittest.TestCase):
         else:
             self.assertGreater(self.data["next_step_closest"]["points_short"], 0)
 
-    def test_utopy_list_matches_a_fresh_calculation_and_the_other_lists_do_not_depend_on_it(self):
-        """Who is listed, the first level that reaches S, the steps and the scores all recompute from the saved numbers."""
+    def test_utopy_table_matches_a_fresh_calculation_and_changes_no_score(self):
+        """Every ranked champion has the 5 levels; each score and tier recomputes from the saved numbers."""
         cards = self.cards_by_name()
         tiers = self.data["tier_stats"]
         mean, spread = tiers["average_pick_score"], tiers["spread"]
-        order = config.MASTERY_ORDER
-        expected = {}
-        for row in self.data["pick_score_list"]:
-            if row["mastery"] == "main" or row["tier"] == "S":
-                continue
-            card = cards[model.normalise(row["riot_name"])]
-            hits = []
-            for level in ("good", "main"):
-                if order.index(level) <= order.index(row["mastery"]):
-                    continue
+        table = {r["id"]: r for r in self.data["utopy_table"]}
+        ranked = {r["id"]: r for r in self.data["pick_score_list"]}
+        self.assertEqual(set(table), set(ranked))
+        for cid, row in table.items():
+            champ = ranked[cid]
+            card = cards[model.normalise(champ["riot_name"])]
+            self.assertEqual(set(row["scores"]), set(config.MASTERY_ORDER))      # the file's keys are sorted
+            self.assertEqual(row["current_mastery"], champ["mastery"])
+            for level in config.MASTERY_ORDER:
                 c = comfort.comfort(card, self.data["trait_average"], level)["comfort"]
-                score = config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * c + config.WEIGHT_OTP * row["otp_points"]
-                if model.tier_of(model.spreads_from_average(score, mean, spread)) == "S":
-                    hits.append((level, score))
-            if hits:
-                expected[row["id"]] = (hits, order.index(hits[0][0]) - order.index(row["mastery"]))
-        listed = {r["id"]: r for r in self.data["utopy_list"]}
-        self.assertEqual(set(listed), set(expected))
-        for cid, (hits, steps) in expected.items():
-            r = listed[cid]
-            self.assertEqual([s["level"] for s in r["scores"]], [h[0] for h in hits])
-            self.assertEqual((r["first_level"], r["steps"]), (hits[0][0], steps))
-            for got, (_, score) in zip(r["scores"], hits):
-                self.assertAlmostEqual(got["score"], score, delta=0.02)
-        keys = [(r["steps"], -r["scores"][0]["score"]) for r in self.data["utopy_list"]]
-        self.assertEqual(keys, sorted(keys))                       # fewest steps first, then highest score
-        if listed:
-            self.assertIsNone(self.data["utopy_closest"])
-        else:
-            self.assertGreater(self.data["utopy_closest"]["points_short"], 0)
-        # information only: every Pick Score is still exactly the recipe
-        for row in self.data["pick_score_list"]:
+                score = config.WEIGHT_STATS * champ["stats"] + config.WEIGHT_COMFORT * c + config.WEIGHT_OTP * champ["otp_points"]
+                self.assertAlmostEqual(row["scores"][level]["score"], score, delta=0.02)
+                self.assertEqual(row["scores"][level]["tier"], model.tier_of(model.spreads_from_average(score, mean, spread)))
+            self.assertAlmostEqual(row["scores"][champ["mastery"]]["score"], champ["pick_score"], delta=0.02)
+        for row in self.data["pick_score_list"]:      # information only: every Pick Score is still exactly the recipe
             self.assertAlmostEqual(row["pick_score"], config.WEIGHT_STATS * row["stats"] + config.WEIGHT_COMFORT * row["comfort"]
                                    + config.WEIGHT_OTP * row["otp_points"], delta=0.02)
+        self.assertNotIn("utopy_list", self.data)
+        self.assertNotIn("utopy_closest", self.data)
+
+    def test_unranked_carded_champions_have_what_the_grey_rows_show(self):
+        for r in self.data["cards_not_ranked"]:
+            for key in ("name", "mastery", "real_games", "real_games_this_patch", "pick_rate", "failed"):
+                self.assertIn(key, r, r["name"])
+            self.assertNotIn(r["name"], [x["name"] for x in self.data["pick_score_list"]])
 
     def test_utopy_table_is_last_on_the_growth_tab_with_its_texts(self):
         html = read("index.html")
         growth = html[html.index('id="tab-growth"'):]
         self.assertLess(growth.index('id="next-table"'), growth.index('id="utopy-table"'))
         self.assertLess(growth.index('id="growth-table"'), growth.index('id="next-table"'))
-        for text in ("Utopy picks", "Long-term goals, information only", 'id="utopy-basis"'):
+        for text in ("Utopy table", "if I mained everyone", "Never played", "Below average", "Average", "Good", "Main",
+                     'id="utopy-basis"', "Skill pays off"):
             self.assertIn(text, growth)
-        self.assertIn("Based on patch", read("app.js"))
-        self.assertIn("can change each patch", read("app.js"))
+        self.assertNotIn("Utopy picks", growth)
+        self.assertNotIn("Steps away", growth)
+        app = read("app.js")
+        self.assertIn("Based on patch", app)
+        self.assertIn("can change each patch", app)
+        self.assertIn('"u_main"', app)                                  # opens sorted by the Main column
+        self.assertIn("utopy-grey", app)                                # unranked rows are grey, at the bottom
+        self.assertIn("utopy-now", app)                                 # the current level is highlighted
+        self.assertNotIn("utopy_list", app + read("format.js"))
 
     def test_growth_tips_follow_the_number_3_rule(self):
         """A tip exists exactly when the target-mastery Pick Score beats both the champion's own score and the current #3 pick."""
@@ -501,7 +500,7 @@ class SiteDataTests(unittest.TestCase):
             source = f.read()
         for key in ("win_rate_warning", "mastery", "traits", "data_label", "otp_players", "otp_games", "cards_not_ranked",
                     "otp_points", "win_rate_delta", "real_games", "pick_score", "comfort", "comfort_parts",
-                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor", "next_step_list", "next_step_closest", "utopy_list", "utopy_closest",
+                    "otp_delta", "otp_win_rate", "needs_a_card", "meta_score_list", "growth_advisor", "next_step_list", "next_step_closest", "utopy_table",
                     "pick_score_at_main", "best_tier_at_main"):
             self.assertIn('"%s"' % key, source)
 

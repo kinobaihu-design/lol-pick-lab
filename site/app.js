@@ -385,13 +385,27 @@
     body.appendChild(tr);
   }
 
+  var UTOPY_LEVELS = ["never_played", "below_average", "average", "good", "main"];
+
   function utopyRows(t, body) {
     var tr = el("tr");
+    if (t.unranked) {
+      tr.className = "utopy-grey";
+      var name = cell(tr, t.name, "champ");
+      name.appendChild(el("span", "sub", F.utopyReason(t.failed) + " \u00b7 " + F.utopyUnrankedNumbers(t)));
+      var span = cell(tr, "no score this patch");
+      span.colSpan = UTOPY_LEVELS.length + 1;
+      body.appendChild(tr);
+      return;
+    }
     cell(tr, t.name, "champ");
-    cell(tr, F.masteryText(t.current_mastery));
-    cell(tr, F.masteryText(t.first_level));
-    cell(tr, F.stepsText(t.steps), "num");
-    cell(tr, F.utopyScoresText(t), "num");
+    UTOPY_LEVELS.forEach(function (level) {
+      var td = el("td", "num utopy-cell" + (level === t.current_mastery ? " utopy-now" : ""));
+      var s = t.scores[level];
+      td.appendChild(el("span", "tier tier-" + s.tier, F.number(s.score, 1)));
+      if (level === t.current_mastery) td.setAttribute("data-tip", "Your mastery now");
+      tr.appendChild(td);
+    });
     cell(tr, F.utopySkillText(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN), "skill");
     body.appendChild(tr);
   }
@@ -526,20 +540,26 @@
     emptyLine.hidden = !hasNext || next.length !== 0;
     document.getElementById("next-old").hidden = hasNext;
 
-    var hasUtopy = Array.isArray(data.utopy_list);
-    var utopy = (data.utopy_list || []).map(function (t) {
+    var hasUtopy = Array.isArray(data.utopy_table);
+    var utopy = (data.utopy_table || []).map(function (t) {
       var copy = {};
       Object.keys(t).forEach(function (k) { copy[k] = t[k]; });
-      copy.skill_delta = F.skillDelta(state.byId[t.id], S.OTP_MIN_GAMES_SHOWN);
+      var ranked = state.byId[t.id];
+      if (ranked && ranked.mastery) copy.current_mastery = ranked.mastery;      // your card now, even before the next collector run
+      copy.skill_delta = F.skillDelta(ranked, S.OTP_MIN_GAMES_SHOWN);
       return copy;
     });
-    tables.utopy = sortableTable("utopy-table", F.UTOPY_COLUMNS, "u_steps", function (t) { return t.scores[0].score; }, utopyRows);
+    // Carded champions that are not ranked this patch: grey rows at the bottom, no score.
+    (hasUtopy ? (data.cards_not_ranked || []) : []).forEach(function (c) {
+      var copy = {};
+      Object.keys(c).forEach(function (k) { copy[k] = c[k]; });
+      copy.unranked = true;
+      utopy.push(copy);
+    });
+    tables.utopy = sortableTable("utopy-table", F.UTOPY_COLUMNS, "u_main", function (t) { return t.unranked ? -1 : t.scores.main.score; }, utopyRows);
     tables.utopy.list = utopy;
     tables.utopy.draw();
-    document.getElementById("utopy-wrap").hidden = utopy.length === 0;
-    var utopyEmpty = document.getElementById("utopy-empty");
-    utopyEmpty.textContent = F.utopyClosestText(data.utopy_closest);
-    utopyEmpty.hidden = !hasUtopy || utopy.length !== 0;
+    document.getElementById("utopy-wrap").hidden = !hasUtopy;
     document.getElementById("utopy-old").hidden = hasUtopy;
     document.getElementById("utopy-basis").textContent = "Based on patch " + data.patch + " data; can change each patch.";
 

@@ -126,3 +126,10 @@ td.traitcell { white-space: normal; min-width: 240px; max-width: 340px; }
 .sitefooter { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .sitefooter p { margin: 0 0 6px; max-width: 900px; }
 .sitefooter .about { font-size: 11px; }
+
+/* Utopy table (v1.3) */
+.utopy-cell .tier { min-width: 3.2em; display: inline-block; text-align: center; }
+.utopy-now .tier { outline: 2px solid currentColor; outline-offset: 2px; font-weight: 700; }
+.utopy-grey { color: var(--muted); background: transparent; }
+.utopy-grey td { color: var(--muted); }
+#utopy-wrap { overflow-x: auto; }

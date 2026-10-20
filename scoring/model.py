@@ -399,7 +399,7 @@ def score_all(root, cards=None, now=None):
 
     advisor = growth_advisor(eligible, carded, pick_list, trait_average, tier_stats)
     next_step, next_step_closest = next_step_list(eligible, carded, pick_list, trait_average, tier_stats)
-    utopy, utopy_closest = utopy_list(eligible, carded, pick_list, trait_average, tier_stats)
+    utopy = utopy_table(eligible, carded, pick_list, trait_average, tier_stats)
 
     def clean(v):
         out = {k: v[k] for k in (
@@ -431,7 +431,10 @@ def score_all(root, cards=None, now=None):
         if card["name"] in ranked_names:
             continue
         cand = next((v for v in lane.values() if normalise(v["riot_name"]) == key), None)
-        cards_not_ranked.append({"name": card["name"], "real_games": cand["real_games"] if cand else 0,
+        cards_not_ranked.append({"name": card["name"], "mastery": card["mastery"],
+                                 "real_games": cand["real_games"] if cand else 0,
+                                 "real_games_this_patch": cand["real_games_this_patch"] if cand else 0,
+                                 "lane_share": cand["lane_share"] if cand else None,
                                  "pick_rate": cand["pick_rate"] if cand else None,
                                  "failed": failed_filters(cand) if cand else ["no bot-lane games found"]})
 
@@ -456,8 +459,7 @@ def score_all(root, cards=None, now=None):
         "excluded_by_pool_rule": excluded,
         "next_step_list": next_step,
         "next_step_closest": next_step_closest,
-        "utopy_list": utopy,
-        "utopy_closest": utopy_closest,
+        "utopy_table": utopy,
         "growth_advisor": advisor,
         "near_misses": sorted(why_out.values(), key=lambda row: (-row["real_games"], row["name"]))[:15],
     }
@@ -544,45 +546,20 @@ def next_step_list(eligible, carded, pick_list, trait_average, tier_stats):
     return rows, (None if rows else closest)
 
 
-def utopy_list(eligible, carded, pick_list, trait_average, tier_stats):
-    """"Utopy picks" (v0.40): long-term goals. Every carded champion whose mastery is not Main and whose tier
-    now is not S, whose Pick Score would reach S at Good or at Main. Returns (rows, closest).
-
-    Same maths as the ceiling at Main: only this one champion's mastery changes, and it is compared with this
-    patch's normal tier cutoffs (the other champions do not change). Only levels ABOVE the current mastery are
-    tried. `steps` counts mastery steps from now to the first level that reaches S. Order: fewest steps, then
-    the highest score at that first level. `closest` (when the list is empty) is the champion nearest to the S
-    line at Main. Information only: nothing here changes a score or any other list.
-    """
-    if not pick_list:
-        return [], None
-    s_line = tier_stats["average_pick_score"] + dict(config.TIER_BOUNDARIES)["S"] * tier_stats["spread"]
-    order = config.MASTERY_ORDER
-    rows, closest = [], None
+def utopy_table(eligible, carded, pick_list, trait_average, tier_stats):
+    """"If I mained everyone" (v1.3, the Utopy table): for every ranked champion with a card, its Pick Score and
+    tier at each of the 5 mastery levels. Only this one champion's mastery changes; the tier is read against this
+    patch's current average and spread. At the champion's own mastery the score is its real Pick Score.
+    Information only: nothing here changes a score, a tier or any other list."""
+    rows = []
     for v in pick_list:
-        if v["mastery"] == "main" or v["tier"] == "S":
-            continue
         k = next(key for key, e in eligible.items() if e is v)
-        here = order.index(v["mastery"])
-        reaching = []                                           # (level, score) that land in S
-        for level in config.UTOPY_LEVELS:
-            if order.index(level) <= here:
-                continue
+        scores = {}
+        for level in config.MASTERY_ORDER:
             score, tier = score_at_mastery(v, carded[k], trait_average, tier_stats, level)
-            if tier == "S":
-                reaching.append({"level": level, "score": score})
-        if reaching:
-            first = reaching[0]
-            rows.append({"id": v["id"], "name": v["name"], "current_mastery": v["mastery"], "tier_now": v["tier"],
-                         "pick_score_now": v["pick_score"], "first_level": first["level"],
-                         "steps": order.index(first["level"]) - here, "scores": reaching})
-        else:
-            main_score = score_at_mastery(v, carded[k], trait_average, tier_stats, "main")[0]
-            if closest is None or main_score > closest["pick_score_at_main"]:
-                closest = {"id": v["id"], "name": v["name"], "tier_now": v["tier"], "pick_score_at_main": main_score,
-                           "points_short": s_line - main_score}
-    rows.sort(key=lambda r: (r["steps"], -r["scores"][0]["score"]))
-    return rows, (None if rows else closest)
+            scores[level] = {"score": score, "tier": tier}
+        rows.append({"id": v["id"], "name": v["name"], "current_mastery": v["mastery"], "scores": scores})
+    return rows
 
 
 def round_floats(value, digits=3):

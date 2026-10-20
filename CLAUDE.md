@@ -218,6 +218,15 @@ All Riot difficulties follow the 1–10 rule (checked against Data Dragon 16.19.
 - **Draven:** stomps early, huge snowball; OTPs shine. Not planning to learn him soon.
 - **Lux, Syndra:** APCs in the current bot-lane meta. **Ziggs:** a bot-lane mage for several seasons. **Hwei:** probably very strong right now; check with data.
 
+## Brief changes v1.3 (no change to the Pick Score), Oct 20, 2026
+
+Pasted from the owner; the live brief has the full details.
+
+- **Utopy table: "if I mained everyone"** (Phase 4, Step 2) replaces the old "Utopy picks" list on the Growth tab (the old list and its code were removed). Information only; it is all "best by this model, for me", so no extra warnings or caveats on the page.
+- One row per carded champion: Pick Score at each of the 5 mastery levels (Never played · Below average · Average · Good · Main), then the compact "skill pays off" line. The current level has an outline; each score is colored by the tier it would reach, using this patch's real tier cutoffs (only that champion's mastery changes). Every column sorts; it opens sorted by Main, highest first. At the champion's own mastery the score equals its real Pick Score (tests check).
+- Carded champions that are not ranked this patch sit at the bottom in grey, always last whatever the sort: the reason (the failed filters in plain words, or "low data" only when under the 1,000 real-games floor), games this patch, pick rate, and no score. They get a score row automatically once they pass the filters.
+- Code: `utopy_table` in `scoring/model.py` (scores file field `utopy_table`; `cards_not_ranked` rows now also carry `mastery`, `real_games_this_patch`, `lane_share`); the page reads them in `site/app.js` / `site/format.js` (`UTOPY_COLUMNS`). `utopy_list` / `utopy_closest` / `UTOPY_LEVELS` no longer exist. An older scores file without `utopy_table` shows a notice until the next collector run. Tests: `UtopyTableTests` (scoring), `SiteDataTests` and `site_format.test.js`.
+
 ## Brief changes v1.2 (no change to the Pick Score), Oct 19, 2026
 
 Pasted from the owner; the live brief has the full details.
@@ -498,6 +507,7 @@ Pasted from the owner; the live brief has the full details.
 
 Newest first. Each block of 10 versions is later folded into one summary row.
 
+- **v1.3** (Oct 20, 2026): no score change. Utopy table "if I mained everyone" replaces the Utopy picks list on the Growth tab.
 - **v1.2** (Oct 19, 2026): no score change. Run summary shows peak memory, the runner's memory and the season player count, with a 60% warning.
 - **v1.1** (Oct 16, 2026): no score change. Season file safe for a full year (in planning; see "Brief changes v1.0 + v1.1").
 - **v1.0** (Oct 16, 2026): Road to 1.0 done; code freeze ends.
