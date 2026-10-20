@@ -55,16 +55,25 @@ class AdminPageTests(unittest.TestCase):
         self.assertIn("noindex", sources["/admin"]["X-Robots-Tag"])
         self.assertIn("noindex", sources["/api/(.*)"]["X-Robots-Tag"])
 
-    def test_admin_is_not_linked_from_the_site(self):
+    def test_admin_is_linked_only_by_the_edit_cards_button_on_the_comfort_tab(self):
         for name in os.listdir(os.path.join(ROOT, "site")):
             path = os.path.join(ROOT, "site", name)
-            if name in ("admin.html", "admin.js") or not os.path.isfile(path):
+            if name in ("admin.html", "admin.js", "index.html") or not os.path.isfile(path):
                 continue
             text = self.read("site", name).lower()
-            self.assertNotIn("/admin", text, name)          # no link or address anywhere
+            self.assertNotIn("/admin", text, name)          # no link or address anywhere else
             self.assertNotIn("admin.html", text, name)
             self.assertNotIn("admin.js", text, name)
-        self.assertNotIn("admin", self.read("site", "index.html").lower())
+        index = self.read("site", "index.html")
+        self.assertEqual(index.count("/admin"), 1)           # one link: the Edit cards button
+        link = index.index('href="/admin"')
+        comfort = index[index.index('id="tab-comfort"'):]
+        self.assertLess(link - index.index('id="tab-comfort"'), len(comfort))
+        self.assertLess(index.index('id="tab-comfort"'), link)
+        self.assertLess(link, index.index('id="tab-growth"'))                  # inside the Comfort tab, before the next tab
+        self.assertIn("Edit cards", index)
+        self.assertRegex(index, r'<a class="editbtn" id="edit-cards" href="/admin"[^>]*rel="[^"]*nofollow')
+        self.assertNotIn("password", index.lower().replace("a password is asked there", ""))   # no password box on the public page
 
     def test_admin_page_has_no_secret_and_only_the_one_button(self):
         text = self.read("site", "admin.html") + self.read("site", "admin.js")

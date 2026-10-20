@@ -149,3 +149,11 @@ td.traitcell { white-space: normal; min-width: 240px; max-width: 340px; }
 .legendnote { margin-left: 12px; }
 .utopy-mark { display: inline-block; padding: 0 6px; border-radius: 4px; background: var(--line); color: var(--text); box-shadow: 0 0 0 1px #14161a, 0 0 0 2px #fff; font-weight: 700; }
 .legendnote .utopy-up { position: static; display: inline; margin-right: 2px; }
+
+/* v1.4 tweaks: bigger champion names in the Utopy table, smaller labels under them; the Edit cards button */
+#utopy-table td.u-champ { font-size: 16px; font-weight: 700; }
+#utopy-table td.u-champ .sub, #utopy-table td.u-champ .utopy-meta { font-size: 10px; font-weight: 400; }
+#utopy-table td.u-champ .chip { font-size: 10px; padding: 0 6px; }
+.editbtn { display: inline-block; margin-left: 8px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text); text-decoration: none; background: var(--card); white-space: nowrap; }
+.editbtn:hover { border-color: var(--muted); }

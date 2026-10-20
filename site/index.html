@@ -23,9 +23,9 @@
   <div id="content" hidden>
     <div class="tabs" role="tablist" aria-label="Pages">
       <button type="button" role="tab" id="tabbtn-tier" data-tab="tier" data-tip-key="tab_tier" aria-selected="true" aria-controls="tab-tier">Tier list</button>
-      <button type="button" role="tab" id="tabbtn-meta" data-tab="meta" data-tip-key="tab_meta" aria-selected="false" aria-controls="tab-meta">Meta</button>
-      <button type="button" role="tab" id="tabbtn-comfort" data-tab="comfort" data-tip-key="tab_comfort" aria-selected="false" aria-controls="tab-comfort">Comfort</button>
       <button type="button" role="tab" id="tabbtn-growth" data-tab="growth" data-tip-key="tab_growth" aria-selected="false" aria-controls="tab-growth">Growth</button>
+      <button type="button" role="tab" id="tabbtn-comfort" data-tab="comfort" data-tip-key="tab_comfort" aria-selected="false" aria-controls="tab-comfort">Comfort</button>
+      <button type="button" role="tab" id="tabbtn-meta" data-tab="meta" data-tip-key="tab_meta" aria-selected="false" aria-controls="tab-meta">Meta</button>
     </div>
 
     <section id="tab-tier" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-tier">
@@ -101,8 +101,9 @@
 
     <section id="tab-comfort" class="tabpanel" role="tabpanel" aria-labelledby="tabbtn-comfort" hidden>
       <p id="mastery-review" class="notice quiet" data-tip-key="mastery_review" tabindex="0"></p>
-      <p class="intro">How each Comfort number is built, one row per carded champion. View only: cards are edited in the project, not here.
-        Comfort = 40% type points + 60% mastery points + kit + difficulty + range (+ flexibility), capped at 100.</p>
+      <p class="intro">How each Comfort number is built, one row per carded champion. View only here: use the button to change a card (a password is asked there).
+        Comfort = 40% type points + 60% mastery points + kit + difficulty + range (+ flexibility), capped at 100.
+        <a class="editbtn" id="edit-cards" href="/admin" target="_blank" rel="noopener nofollow">Edit cards</a></p>
       <div class="tablewrap">
         <table id="comfort-table">
           <thead>

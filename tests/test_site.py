@@ -172,7 +172,7 @@ class TabTests(unittest.TestCase):
         html = read("index.html")
         buttons = re.findall(r'<button[^>]*role="tab"[^>]*data-tab="(\w+)"[^>]*aria-selected="(\w+)"[^>]*>([^<]+)</button>', html)
         self.assertEqual([(b[0], b[2]) for b in buttons],
-                         [("tier", "Tier list"), ("meta", "Meta"), ("comfort", "Comfort"), ("growth", "Growth")])
+                         [("tier", "Tier list"), ("growth", "Growth"), ("comfort", "Comfort"), ("meta", "Meta")])
         self.assertEqual([b[1] for b in buttons], ["true", "false", "false", "false"])
         panels = re.findall(r'<section id="tab-(\w+)" class="tabpanel"[^>]*?( hidden)?>', html)
         self.assertEqual([p[0] for p in panels], ["tier", "meta", "comfort", "growth"])
