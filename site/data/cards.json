@@ -844,9 +844,9 @@
      "strength": "mid"
     }
    ],
-   "mastery": "below_average",
+   "mastery": "average",
    "traits": {
-    "wave_clear": "low",
+    "wave_clear": "mid",
     "aoe": "low",
     "sustain": "low",
     "burst": "mid",
